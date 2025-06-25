@@ -1,0 +1,404 @@
+name: Development
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-22.04
+    outputs:
+      has_php_changed: ${{ steps.changes.outputs.php }}
+      has_rust_changed: ${{ steps.changes.outputs.rust }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ github.head_ref }}
+
+    - name: Detect file changes
+      id: changes
+      uses: dorny/paths-filter@v3
+      with:
+        filters: |
+          php:
+            - '**/*.php'
+            - 'composer.json'
+            - 'src/**'
+            - 'tests/**'
+            - 'composer.*'
+            - 'phpunit.xml'
+            - 'phpstan.neon'
+          rust:
+            - '**/*.rs'
+            - 'Cargo.toml'
+            - 'Cargo.lock'
+            - 'rust-toolchain.toml'
+            - 'crates/**'
+            - 'bin/build.sh'
+
+  check-php-quality:
+    name: Check PHP Code Quality
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_php_changed == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.head_ref }}
+
+    - name: Get PHP version from composer.json
+      id: php-version
+      run: |
+        # Extract PHP version and strip constraint operators (^, ~, >=, etc.)
+        PHP_VERSION=$(jq -r '.require.php' composer.json | sed 's/[^0-9.]*//g')
+        echo "version=${PHP_VERSION}" >> "${GITHUB_OUTPUT}"
+        echo "Using PHP version: ${PHP_VERSION}"
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ steps.php-version.outputs.version }}
+        coverage: none
+
+    - name: Get composer cache directory
+      id: composer-cache
+      run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.composer-cache.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer
+
+    - name: Install dependencies
+      run: composer install --no-progress
+
+    - name: Check code formatting
+      run: composer format:check
+
+    - name: Run static analysis
+      run: composer stan
+
+  check-rust-quality:
+    name: Check Rust Code Quality
+    needs: [detect-changes, check-php-quality]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.has_rust_changed == 'true' &&
+      (needs.check-php-quality.result == 'success' || needs.check-php-quality.result == 'skipped')
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.head_ref }}
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          ~/.rustup
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ runner.os }}-cargo
+
+    - name: Check code formatting
+      run: cargo fmt --check
+
+    - name: Run linter
+      run: cargo clippy --lib -- -D warnings
+
+  run-rust-tests:
+    name: Run Rust Tests
+    needs: [detect-changes, check-php-quality, check-rust-quality]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.has_rust_changed == 'true' &&
+      (needs.check-php-quality.result == 'success' || needs.check-php-quality.result == 'skipped') &&
+      needs.check-rust-quality.result == 'success'
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.head_ref }}
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          ~/.rustup
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ runner.os }}-cargo
+
+    - name: Run unit tests
+      run: cargo test --lib --bins --jobs 2
+
+  find-native-libraries:
+    name: Find Native Libraries
+    needs: [detect-changes, check-php-quality]
+    if: needs.detect-changes.outputs.has_php_changed == 'true' && needs.detect-changes.outputs.has_rust_changed == 'false'
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.head_ref }}
+
+    - name: Check all native libraries exist
+      uses: andstor/file-existence-action@v3
+      with:
+        files: 'platforms/darwin-arm64/libprotect_ffi.dylib, platforms/darwin-x64/libprotect_ffi.dylib, platforms/linux-arm64-gnu/libprotect_ffi.so, platforms/linux-x64-gnu/libprotect_ffi.so, platforms/win32-x64-msvc/protect_ffi.dll'
+        fail: true
+
+  build-native-libraries:
+    name: Build Native Libraries
+    needs: [detect-changes, check-php-quality, check-rust-quality, run-rust-tests]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.has_rust_changed == 'true' &&
+      (needs.check-php-quality.result == 'success' || needs.check-php-quality.result == 'skipped') &&
+      needs.check-rust-quality.result == 'success' &&
+      needs.run-rust-tests.result == 'success'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS Apple Silicon (ARM64)
+          - os: macos-14
+            platform: darwin-arm64
+            target: aarch64-apple-darwin
+          # macOS Intel (x64)
+          - os: macos-13
+            platform: darwin-x64
+            target: x86_64-apple-darwin
+          # Linux ARM64 (GNU libc)
+          - os: ubuntu-22.04-arm
+            platform: linux-arm64-gnu
+            target: aarch64-unknown-linux-gnu
+          # Linux x64 (GNU libc)
+          - os: ubuntu-22.04
+            platform: linux-x64-gnu
+            target: x86_64-unknown-linux-gnu
+          # Windows x64 (MSVC)
+          - os: windows-2022
+            platform: win32-x64-msvc
+            target: x86_64-pc-windows-msvc
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.head_ref }}
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          ~/.rustup
+          target
+        key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.target }}-cargo
+          ${{ runner.os }}-cargo
+
+    - name: Build library
+      run: ./bin/build.sh ${{ matrix.target }} --production
+
+    - name: Upload library
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.platform }}
+        path: platforms/${{ matrix.platform }}/
+
+  run-php-tests:
+    name: Run PHP Tests
+    needs: [detect-changes, check-php-quality, find-native-libraries, build-native-libraries]
+    if: |
+      always() &&
+      (needs.detect-changes.outputs.has_php_changed == 'true' || needs.detect-changes.outputs.has_rust_changed == 'true') &&
+      (needs.check-php-quality.result == 'success' || needs.check-php-quality.result == 'skipped') &&
+      (needs.find-native-libraries.result == 'success' || needs.find-native-libraries.result == 'skipped') &&
+      (needs.build-native-libraries.result == 'success' || needs.build-native-libraries.result == 'skipped')
+    runs-on: ${{ matrix.os }}
+    environment: development
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS Apple Silicon (ARM64) - PHP 8.1, 8.2, 8.3, 8.4
+          - os: macos-14
+            platform: darwin-arm64
+            php-version: '8.1'
+          - os: macos-14
+            platform: darwin-arm64
+            php-version: '8.2'
+          - os: macos-14
+            platform: darwin-arm64
+            php-version: '8.3'
+          - os: macos-14
+            platform: darwin-arm64
+            php-version: '8.4'
+          # macOS Intel (x64) - PHP 8.1, 8.2, 8.3, 8.4
+          - os: macos-13
+            platform: darwin-x64
+            php-version: '8.1'
+          - os: macos-13
+            platform: darwin-x64
+            php-version: '8.2'
+          - os: macos-13
+            platform: darwin-x64
+            php-version: '8.3'
+          - os: macos-13
+            platform: darwin-x64
+            php-version: '8.4'
+          # Linux ARM64 (GNU libc) - PHP 8.1, 8.2, 8.3, 8.4
+          - os: ubuntu-22.04-arm
+            platform: linux-arm64-gnu
+            php-version: '8.1'
+          - os: ubuntu-22.04-arm
+            platform: linux-arm64-gnu
+            php-version: '8.2'
+          - os: ubuntu-22.04-arm
+            platform: linux-arm64-gnu
+            php-version: '8.3'
+          - os: ubuntu-22.04-arm
+            platform: linux-arm64-gnu
+            php-version: '8.4'
+          # Linux x64 (GNU libc) - PHP 8.1, 8.2, 8.3, 8.4
+          - os: ubuntu-22.04
+            platform: linux-x64-gnu
+            php-version: '8.1'
+          - os: ubuntu-22.04
+            platform: linux-x64-gnu
+            php-version: '8.2'
+          - os: ubuntu-22.04
+            platform: linux-x64-gnu
+            php-version: '8.3'
+          - os: ubuntu-22.04
+            platform: linux-x64-gnu
+            php-version: '8.4'
+          # Windows x64 (MSVC) - PHP 8.1, 8.2, 8.3, 8.4
+          - os: windows-2022
+            platform: win32-x64-msvc
+            php-version: '8.1'
+          - os: windows-2022
+            platform: win32-x64-msvc
+            php-version: '8.2'
+          - os: windows-2022
+            platform: win32-x64-msvc
+            php-version: '8.3'
+          - os: windows-2022
+            platform: win32-x64-msvc
+            php-version: '8.4'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.head_ref }}
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php-version }}
+        extensions: ffi
+        coverage: none
+
+    - name: Get composer cache directory
+      id: composer-cache
+      run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.composer-cache.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer
+
+    - name: Install dependencies
+      run: composer install --no-progress
+
+    - name: Download all native libraries
+      if: needs.detect-changes.outputs.has_rust_changed == 'true'
+      uses: actions/download-artifact@v4
+      with:
+        path: platforms/
+
+    - name: Run unit tests
+      run: composer test:unit
+
+    - name: Run integration tests
+      env:
+        CS_CLIENT_ACCESS_KEY: ${{ secrets.CS_CLIENT_ACCESS_KEY }}
+        CS_CLIENT_ID: ${{ secrets.CS_CLIENT_ID }}
+        CS_CLIENT_KEY: ${{ secrets.CS_CLIENT_KEY }}
+        CS_WORKSPACE_CRN: ${{ secrets.CS_WORKSPACE_CRN }}
+      run: composer test:integration
+
+  commit-native-libraries:
+    name: Commit Native Libraries
+    needs: [detect-changes, build-native-libraries, run-php-tests]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.has_rust_changed == 'true' &&
+      needs.build-native-libraries.result == 'success' &&
+      needs.run-php-tests.result == 'success'
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+        ref: ${{ github.head_ref }}
+
+    - name: Get source commit
+      id: source-commit
+      run: echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+    - name: Download all native libraries
+      uses: actions/download-artifact@v4
+      with:
+        path: platforms/
+
+    - name: Commit all native libraries
+      uses: getsentry/action-github-commit@v2.0.0
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        message: |
+          build(platforms): update all native libraries
+
+          Source: ${{ steps.source-commit.outputs.sha }}

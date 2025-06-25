@@ -1,0 +1,22 @@
+[package]
+name = "protect-ffi"
+version = "0.1.0"
+license = "ISC"
+edition = "2021"
+rust-version = "1.83.0"
+exclude = ["*.so", "*.dll", "*.dylib"]
+
+[lib]
+crate-type = ["cdylib"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cipherstash-client = "0.22.2"
+hex = { version = "0.4.3", default-features = false }
+libc = "0.2"
+once_cell = { version = "1.20.2", default-features = false }
+serde = { version = "1.0.218", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.139", default-features = false }
+thiserror = "2.0.8"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }

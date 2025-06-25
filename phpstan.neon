@@ -1,0 +1,14 @@
+parameters:
+    level: 10
+    paths:
+        - src
+        - tests
+    ignoreErrors:
+        - '#Call to an undefined method FFI::new_client\(\)#'
+        - '#Call to an undefined method FFI::encrypt\(\)#'
+        - '#Call to an undefined method FFI::decrypt\(\)#'
+        - '#Call to an undefined method FFI::encrypt_bulk\(\)#'
+        - '#Call to an undefined method FFI::decrypt_bulk\(\)#'
+        - '#Call to an undefined method FFI::create_search_terms\(\)#'
+        - '#Call to an undefined method FFI::free_client\(\)#'
+        - '#Call to an undefined method FFI::free_string\(\)#'
