@@ -55,24 +55,7 @@ CREATE TABLE patient_records (
 );
 ```
 
-After creating tables with encrypted columns, you must configure the search indexes for each column to enable querying with EQL functions:
-
-```sql
--- Configure search indexes for each encrypted column
-SELECT eql_v2.add_search_config('patient_records', 'email', 'unique', 'text');
-SELECT eql_v2.add_search_config('patient_records', 'systolic_bp', 'ore', 'int');
-SELECT eql_v2.add_search_config('patient_records', 'medical_notes', 'match', 'text');
-SELECT eql_v2.add_search_config('patient_records', 'health_assessment', 'ste_vec', 'jsonb', '{"prefix":"patient_records/health_assessment"}');
-
--- Activate the search configuration
-SELECT eql_v2.encrypt();
-SELECT eql_v2.activate();
-```
-
-> [!IMPORTANT]
-> The `eql_v2.add_search_config` calls are required for the EQL functions shown in the SQL examples to work properly. Each call configures a specific index type for an encrypted column, and the configuration must be activated with `eql_v2.encrypt()` and `eql_v2.activate()` before the indexes can be used in queries.
-
-You can find query examples and patterns in the [EQL documentation](https://github.com/cipherstash/encrypt-query-language#searching-data-with-eql).
+See the [EQL installation instructions](https://github.com/cipherstash/encrypt-query-language#installation) to get started.
 
 ### Encryption Configuration
 
