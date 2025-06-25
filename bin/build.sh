@@ -76,10 +76,11 @@ build_library() {
     fi
 
     local build_cmd="cargo build --release --target $RUST_TARGET"
+    local version_cmd="rustc --version"
 
     echo "🦀 Building library..."
-    echo -e "   ${CYAN}▶ rustc --version${NC}"
-    rustc --version | while IFS= read -r line; do
+    echo -e "   ${CYAN}▶ $version_cmd${NC}"
+    $version_cmd | while IFS= read -r line; do
         echo "   $line"
     done
     echo ""
