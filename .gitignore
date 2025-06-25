@@ -1,0 +1,15 @@
+vendor/
+target/
+
+composer.lock
+.phpunit.cache
+phpunit.xml
+phpstan.tests.neon
+
+cargo.log
+cross.log
+
+.env
+cipherstash.secret.toml
+
+cipherstash-*.sql

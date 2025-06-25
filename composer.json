@@ -1,0 +1,62 @@
+{
+    "name": "cipherstash/protectphp-ffi",
+    "description": "PHP bindings for the CipherStash Client SDK",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "CipherStash",
+            "email": "hello@cipherstash.com"
+        },
+        {
+            "name": "coreyhn",
+            "email": "c@corey.hn"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "ext-ffi": "*"
+    },
+    "require-dev": {
+        "laravel/pint": "1.20.0",
+        "phpstan/phpstan": "2.1.17",
+        "phpunit/phpunit": "10.5.46"
+    },
+    "autoload": {
+        "psr-4": {
+            "CipherStash\\Protect\\FFI\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "CipherStash\\Protect\\FFI\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "build": "./bin/build.sh",
+        "test": "@test:all",
+        "test:unit": [
+            "@putenv TEST_LOAD_ENV_FILE=false",
+            "phpunit --testsuite=Unit"
+        ],
+        "test:integration": [
+            "@putenv TEST_LOAD_ENV_FILE=true",
+            "phpunit --testsuite=Integration"
+        ],
+        "test:all": [
+            "@test:unit",
+            "@test:integration"
+        ],
+        "format": "pint",
+        "format:check": "pint --test",
+        "stan": "phpstan analyse",
+        "check": [
+            "@format:check",
+            "@stan"
+        ]
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable"
+}
