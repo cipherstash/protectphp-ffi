@@ -3,7 +3,6 @@ target/
 
 composer.lock
 .phpunit.cache
-phpunit.xml
 phpstan.tests.neon
 
 cargo.log
