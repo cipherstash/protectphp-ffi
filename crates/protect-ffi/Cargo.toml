@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cipherstash-client = "0.22.2"
+cipherstash-client = "0.23.0"
 hex = { version = "0.4.3", default-features = false }
 libc = "0.2"
 once_cell = { version = "1.20.2", default-features = false }
