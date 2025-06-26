@@ -13,8 +13,10 @@ const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[2];
 /// Table and column identifier for encryption configuration lookup.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Identifier {
+    /// The table name.
     #[serde(rename = "t")]
     pub table: String,
+    /// The column name.
     #[serde(rename = "c")]
     pub column: String,
 }
@@ -61,16 +63,20 @@ impl IntoIterator for Table {
 /// Root encryption configuration structure parsed from JSON.
 #[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct EncryptConfig {
+    /// The schema version.
     #[serde(rename = "v")]
     pub version: u32,
+    /// The set of table configurations.
     pub tables: Tables,
 }
 
-/// Column configuration with encryption casting and index options.
+/// Column configuration with casting and encryption indexes.
 #[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]
 pub struct Column {
+    /// Data type casting for this column.
     #[serde(default)]
     cast_as: CastAs,
+    /// Collection of encryption indexes for this column.
     #[serde(default)]
     indexes: Indexes,
 }
@@ -79,28 +85,42 @@ pub struct Column {
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum CastAs {
+    /// Treat as UTF-8 text (default).
     #[default]
     Text,
+    /// Treat as a boolean value.
     Boolean,
+    /// Treat as a 16-bit integer.
     SmallInt,
+    /// Treat as a 32-bit integer.
     Int,
+    /// Treat as a 64-bit integer.
     BigInt,
+    /// Treat as a single-precision float.
     Real,
+    /// Treat as a double-precision float.
     Double,
+    /// Treat as a date.
     Date,
+    /// Treat as a JSONB value.
     #[serde(rename = "jsonb")]
     JsonB,
 }
 
-/// Collection of index configurations for searchable encryption.
+/// Collection of indexes for searchable encryption and uniqueness constraints.
 #[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq)]
 pub struct Indexes {
+    /// Unique index for exact equality queries and enforcing database uniqueness constraints.
     #[serde(rename = "unique")]
     unique_index: Option<UniqueIndexOpts>,
+    /// Order-revealing encryption index for equality checks, range comparisons, range queries,
+    /// and sorting operations.
     #[serde(rename = "ore")]
     ore_index: Option<OreIndexOpts>,
+    /// Full-text search index using bloom filters for probabilistic text matching.
     #[serde(rename = "match")]
     match_index: Option<MatchIndexOpts>,
+    /// Structured text encryption vector index for JSONB containment queries.
     #[serde(rename = "ste_vec")]
     ste_vec_index: Option<SteVecIndexOpts>,
 }
@@ -112,14 +132,19 @@ pub struct OreIndexOpts {}
 /// Configuration options for full-text search indexes using bloom filters.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct MatchIndexOpts {
+    /// The tokenizer to use for splitting text.
     #[serde(default = "default_tokenizer")]
     tokenizer: Tokenizer,
+    /// Token filters to apply to tokens.
     #[serde(default)]
     token_filters: Vec<TokenFilter>,
+    /// Number of hash functions for the bloom filter.
     #[serde(default = "default_k")]
     k: usize,
+    /// Bloom filter size in bits.
     #[serde(default = "default_m")]
     m: usize,
+    /// Whether to include the original value in the index.
     #[serde(default)]
     include_original: bool,
 }
@@ -127,6 +152,7 @@ pub struct MatchIndexOpts {
 /// Configuration options for structured text encryption vectors.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct SteVecIndexOpts {
+    /// The prefix for the structured text encryption vector.
     prefix: String,
 }
 
@@ -145,9 +171,11 @@ fn default_m() -> usize {
     2048
 }
 
-/// Configuration options for HMAC-based unique constraint indexes.
+/// Configuration options for HMAC unique indexes that enable exact equality queries and
+/// database uniqueness constraints.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct UniqueIndexOpts {
+    /// Token filters to apply to unique index tokens.
     #[serde(default)]
     token_filters: Vec<TokenFilter>,
 }
@@ -182,7 +210,8 @@ impl FromStr for EncryptConfig {
 }
 
 impl EncryptConfig {
-    /// Convert the encryption configuration into a HashMap for fast column lookups.
+    /// Convert the encryption configuration into a [`HashMap`] mapping [`Identifier`] to
+    /// [`ColumnConfig`] for fast column lookups.
     pub fn into_config_map(self) -> HashMap<Identifier, ColumnConfig> {
         let mut map = HashMap::new();
         for (table_name, columns) in self.tables.into_iter() {
@@ -197,7 +226,7 @@ impl EncryptConfig {
 }
 
 impl Column {
-    /// Convert this column configuration into a CipherStash ColumnConfig.
+    /// Convert this column configuration into a [`ColumnConfig`].
     pub fn into_column_config(self, name: &String) -> ColumnConfig {
         let mut config = ColumnConfig::build(name.to_string()).casts_as(self.cast_as.into());
 

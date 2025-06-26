@@ -1,7 +1,10 @@
-//! PHP bindings for the CipherStash Client SDK.
+//! FFI bindings for the CipherStash Client SDK.
 //!
-//! Provides C-compatible functions for PHP FFI integration with proper
+//! This crate provides C-compatible functions for PHP FFI integration with proper
 //! error handling and memory management.
+//!
+//! The main entry point is the [`Client`] type, which manages encryption and decryption
+//! operations. All FFI functions operate on or return a pointer to a [`Client`] instance.
 
 use cipherstash_client::{
     config::{
@@ -47,23 +50,24 @@ pub struct Client {
     encrypt_config: Arc<HashMap<Identifier, ColumnConfig>>,
 }
 
-/// An encrypted value that can contain either ciphertext or searchable vector data.
+/// An encrypted value with associated encryption indexes or structured text encryption vectors.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "k")]
 pub enum Encrypted {
-    /// Standard encrypted ciphertext with optional search indexes.
+    /// Encrypted ciphertext with encryption indexes based on column configuration.
     #[serde(rename = "ct")]
     Ciphertext {
         /// Base85-encoded ciphertext containing the encrypted data.
         #[serde(rename = "c")]
         ciphertext: String,
-        /// HMAC index for exact equality queries and uniqueness constraints (optional).
+        /// HMAC index for exact equality queries and uniqueness constraints.
         #[serde(rename = "hm")]
         unique_index: Option<String>,
-        /// Order-revealing encryption index for range queries (optional).
+        /// Order-revealing encryption index for equality checks, range comparisons, range queries, and
+        /// sorting operations.
         #[serde(rename = "ob")]
         ore_index: Option<Vec<String>>,
-        /// Bloom filter index for full-text search queries (optional).
+        /// Bloom filter index for full-text search queries.
         #[serde(rename = "bf")]
         match_index: Option<Vec<u16>>,
         /// Table and column identifier for this encrypted value.
@@ -73,7 +77,7 @@ pub enum Encrypted {
         #[serde(rename = "v")]
         version: u16,
     },
-    /// Structured text encryption vector for JSONB containment queries.
+    /// Encrypted ciphertext with structured text encryption vector for JSONB containment queries.
     #[serde(rename = "sv")]
     SteVec {
         /// Base85-encoded ciphertext containing the encrypted data.
@@ -153,13 +157,13 @@ struct ClientConfig {
 ///
 /// # Errors
 ///
-/// Returns an error if the configuration string is invalid JSON, contains unsupported
-/// encryption options, or if the CipherStash client cannot be initialized.
+/// Returns an error if the `config_str` is invalid JSON, contains unsupported
+/// encryption options, or if the client cannot be initialized.
 ///
 /// # Safety
 ///
 /// The caller must ensure `config_str` points to a valid null-terminated C string.
-/// The returned pointer must be freed using `free_client()`.
+/// The returned pointer must be freed using [`free_client()`].
 #[no_mangle]
 pub extern "C" fn new_client(
     config_str: *const c_char,
@@ -199,7 +203,7 @@ async fn new_client_inner(encrypt_config: EncryptConfig) -> Result<Client, Error
 
 /// Encrypts plaintext for a specific table column.
 ///
-/// Returns a JSON string containing the encrypted result and search indexes.
+/// Returns a JSON string containing the encrypted result and encryption indexes.
 ///
 /// # Errors
 ///
@@ -209,7 +213,7 @@ async fn new_client_inner(encrypt_config: EncryptConfig) -> Result<Client, Error
 /// # Safety
 ///
 /// All pointer parameters must be valid null-terminated C strings.
-/// The returned pointer must be freed using `free_string()`.
+/// The returned pointer must be freed using [`free_string()`].
 #[no_mangle]
 pub extern "C" fn encrypt(
     client: *const Client,
@@ -321,13 +325,13 @@ fn parse_encryption_context(context_json: &str) -> Result<Vec<zerokms::Context>,
 ///
 /// # Errors
 ///
-/// Returns an error if the ciphertext is invalid, the encryption context JSON is malformed,
+/// Returns an error if the `ciphertext` is invalid, the encryption context JSON is malformed,
 /// or decryption fails due to key or permission issues.
 ///
 /// # Safety
 ///
 /// All pointer parameters must be valid null-terminated C strings.
-/// The returned pointer must be freed using `free_string()`.
+/// The returned pointer must be freed using [`free_string()`].
 #[no_mangle]
 pub extern "C" fn decrypt(
     client: *const Client,
@@ -410,7 +414,7 @@ fn to_eql_encrypted(
 ) -> Result<Encrypted, Error> {
     match encrypted {
         encryption::Encrypted::Record(ciphertext, terms) => {
-            // Collect search indexes from encryption terms
+            // Collect encryption indexes from encryption terms
             struct Indexes {
                 unique_index: Option<String>,
                 ore_index: Option<Vec<String>>,
@@ -502,27 +506,40 @@ fn format_index_term_ore(bytes: &Vec<u8>) -> Vec<String> {
     vec![format_index_term_ore_bytea(bytes)]
 }
 
+/// Bulk encryption request item containing plaintext data and metadata.
 #[derive(Deserialize)]
 struct BulkEncryptItem {
+    /// The plaintext data to encrypt.
     plaintext: String,
+    /// The target column name.
     column: String,
+    /// The target table name.
     table: String,
+    /// Optional encryption context (defaults to empty if not provided).
     #[serde(default)]
     context: Option<serde_json::Value>,
 }
 
+/// Bulk decryption request item containing ciphertext and optional context.
 #[derive(Deserialize)]
 struct BulkDecryptItem {
+    /// The ciphertext to decrypt.
     ciphertext: String,
+    /// Optional encryption context (defaults to empty if not provided).
     #[serde(default)]
     context: Option<serde_json::Value>,
 }
 
+/// Search term creation request item containing plaintext and target metadata.
 #[derive(Deserialize)]
 struct SearchTermItem {
+    /// The plaintext data to create search terms for.
     plaintext: String,
+    /// The target column name.
     column: String,
+    /// The target table name.
     table: String,
+    /// Optional encryption context (defaults to empty if not provided).
     #[serde(default)]
     context: Option<serde_json::Value>,
 }
@@ -537,7 +554,7 @@ struct SearchTermItem {
 /// # Safety
 ///
 /// All pointer parameters must be valid null-terminated C strings.
-/// The returned pointer must be freed using `free_string()`.
+/// The returned pointer must be freed using [`free_string()`].
 #[no_mangle]
 pub extern "C" fn encrypt_bulk(
     client: *const Client,
@@ -626,13 +643,13 @@ async fn encrypt_bulk_inner(
 ///
 /// # Errors
 ///
-/// Returns an error if the JSON input is malformed, contains invalid ciphertext,
+/// Returns an error if the JSON input is malformed, contains invalid `ciphertext`,
 /// has malformed encryption context, or if decryption fails.
 ///
 /// # Safety
 ///
 /// All pointer parameters must be valid null-terminated C strings.
-/// The returned pointer must be freed using `free_string()`.
+/// The returned pointer must be freed using [`free_string()`].
 #[no_mangle]
 pub extern "C" fn decrypt_bulk(
     client: *const Client,
@@ -698,7 +715,8 @@ async fn decrypt_bulk_inner(
 /// Creates encrypted search terms for querying encrypted data.
 ///
 /// Returns a JSON array of encrypted search terms that can be used in database queries.
-/// Each search term contains the search indexes (ore, match, unique, ste_vec) but not the full ciphertext.
+/// Each search term contains the encryption indexes (`unique`, `ore`, `match`, `ste_vec`)
+/// but not the full ciphertext.
 ///
 /// # Errors
 ///
@@ -708,7 +726,7 @@ async fn decrypt_bulk_inner(
 /// # Safety
 ///
 /// All pointer parameters must be valid null-terminated C strings.
-/// The returned pointer must be freed using `free_string()`.
+/// The returned pointer must be freed using [`free_string()`].
 #[no_mangle]
 pub extern "C" fn create_search_terms(
     client: *const Client,
@@ -796,7 +814,7 @@ pub extern "C" fn create_search_terms(
 ///
 /// # Safety
 ///
-/// The client pointer must have been returned by `new_client()` and not previously freed.
+/// The `client` pointer must have been returned by [`new_client()`] and not previously freed.
 #[no_mangle]
 pub extern "C" fn free_client(client: *mut Client) {
     safe_ffi::free_boxed_client(client);
@@ -806,7 +824,7 @@ pub extern "C" fn free_client(client: *mut Client) {
 ///
 /// # Safety
 ///
-/// The string pointer must have been returned by this library and not previously freed.
+/// The `s` pointer must have been returned by this library and not previously freed.
 #[no_mangle]
 pub extern "C" fn free_string(s: *mut c_char) {
     safe_ffi::free_c_string(s);

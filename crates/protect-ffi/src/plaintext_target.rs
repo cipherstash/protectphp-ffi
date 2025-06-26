@@ -1,4 +1,4 @@
-//! PlaintextTarget creation with workarounds for upstream SDK limitations.
+//! [`PlaintextTarget`] creation with workaround for upstream SDK.
 
 use cipherstash_client::{
     encryption::PlaintextTarget,
@@ -7,24 +7,19 @@ use cipherstash_client::{
 
 use crate::Error;
 
-/// Creates a PlaintextTarget with specialized handling for JSONB columns with ste_vec indexes.
+/// Creates a [`PlaintextTarget`] with specialized handling for JSONB columns with `ste_vec` indexes.
 ///
-/// # Workaround
+/// For JSONB columns configured with `ste_vec` indexes, JSON strings are pre-parsed to
+/// [`serde_json::Value`] to ensure correct type resolution in the upstream SDK. The expected
+/// behavior in the upstream SDK is to resolve JSON strings as
+/// [`cipherstash_client::encryption::Plaintext::Utf8Str`] instead of
+/// [`cipherstash_client::encryption::Plaintext::JsonB`], so this pre-parsing step ensures the
+/// correct type inference for `ste_vec` index compatibility.
 ///
-/// This function works around a type resolution limitation in cipherstash-client v0.22.2
-/// where JSON string inputs to JSONB columns configured with `ste_vec` indexes
-/// are resolved as `Plaintext::Utf8Str` instead of the expected `Plaintext::JsonB`.
+/// # Errors
 ///
-/// **Context:** The upstream SDK's type resolution has incomplete support for
-/// the interaction between JSONB casting and structured text encryption vectors,
-/// resulting in string type inference instead of JSONB type.
-///
-/// **Solution:** Pre-parse JSON strings to `serde_json::Value` to bypass the
-/// type inference limitation and directly provide the correct input type.
-///
-/// # TODO
-///
-/// Remove this workaround when cipherstash-client addresses the type resolution limitation.
+/// Returns an error if the input string is not valid JSON when targeting a JSONB column
+/// with `ste_vec` indexes.
 pub fn new(plaintext: String, column_config: &ColumnConfig) -> Result<PlaintextTarget, Error> {
     let needs_json_parsing = column_config.cast_type == ColumnType::JsonB
         && column_config
