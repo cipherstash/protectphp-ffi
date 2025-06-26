@@ -251,7 +251,6 @@ jobs:
       (needs.find-native-libraries.result == 'success' || needs.find-native-libraries.result == 'skipped') &&
       (needs.build-native-libraries.result == 'success' || needs.build-native-libraries.result == 'skipped')
     runs-on: ${{ matrix.os }}
-    environment: development
     strategy:
       fail-fast: false
       matrix:
