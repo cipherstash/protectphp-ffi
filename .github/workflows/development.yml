@@ -36,7 +36,6 @@ jobs:
             - 'composer.json'
             - 'src/**'
             - 'tests/**'
-            - 'composer.*'
             - 'phpunit.xml'
             - 'phpstan.neon'
           rust:
@@ -45,7 +44,6 @@ jobs:
             - 'Cargo.lock'
             - 'rust-toolchain.toml'
             - 'crates/**'
-            - 'bin/build.sh'
 
   check-php-quality:
     name: Check PHP Code Quality
