@@ -9,7 +9,7 @@ use std::ptr;
 ///
 /// # Errors
 ///
-/// Returns `Error::NullPointer` if the provided pointer is null.
+/// Returns [`Error::NullPointer`] if the provided pointer is null.
 ///
 /// # Safety
 ///
@@ -22,12 +22,12 @@ pub fn client_ref<'a>(client: *const Client) -> Result<&'a Client, Error> {
     }
 }
 
-/// Safely convert a raw C string to a Rust String.
+/// Safely convert a raw C string to a Rust [`String`].
 ///
 /// # Errors
 ///
-/// Returns `Error::NullPointer` if the provided pointer is null, or
-/// `Error::Utf8` if the C string contains invalid UTF-8.
+/// Returns [`Error::NullPointer`] if the provided pointer is null, or
+/// [`Error::Utf8`] if the C string contains invalid UTF-8.
 ///
 /// # Safety
 ///
@@ -43,11 +43,11 @@ pub fn c_str_to_string(s: *const c_char) -> Result<String, Error> {
     }
 }
 
-/// Safely convert an optional C string (can be null) to an Option<String>.
+/// Safely convert an optional C string (can be null) to an [`Option<String>`].
 ///
 /// # Errors
 ///
-/// Returns `Error::Utf8` if the C string contains invalid UTF-8.
+/// Returns [`Error::Utf8`] if the C string contains invalid UTF-8.
 ///
 /// # Safety
 ///
@@ -60,11 +60,11 @@ pub fn optional_c_str_to_string(s: *const c_char) -> Result<Option<String>, Erro
     }
 }
 
-/// Convert a Rust String to a C string pointer.
+/// Convert a Rust [`String`] to a C string pointer.
 ///
 /// # Errors
 ///
-/// Returns `Error::StringConversion` if the string contains null bytes.
+/// Returns [`Error::StringConversion`] if the string contains null bytes.
 pub fn string_to_c_str(s: String) -> Result<*mut c_char, Error> {
     CString::new(s)
         .map(|cs| cs.into_raw())
@@ -75,7 +75,7 @@ pub fn string_to_c_str(s: String) -> Result<*mut c_char, Error> {
 ///
 /// # Safety
 ///
-/// The caller must ensure the pointer was created by Box::into_raw and hasn't been freed.
+/// The caller must ensure the pointer was created by [`Box::into_raw`] and hasn't been freed.
 pub fn free_boxed_client(client: *mut Client) {
     if !client.is_null() {
         unsafe {
@@ -88,7 +88,7 @@ pub fn free_boxed_client(client: *mut Client) {
 ///
 /// # Safety
 ///
-/// The caller must ensure the pointer was created by CString::into_raw and hasn't been freed.
+/// The caller must ensure the pointer was created by [`CString::into_raw`] and hasn't been freed.
 pub fn free_c_string(s: *mut c_char) {
     if !s.is_null() {
         unsafe {
@@ -101,7 +101,7 @@ pub fn free_c_string(s: *mut c_char) {
 ///
 /// # Safety
 ///
-/// The caller must ensure error_out points to a valid mutable pointer.
+/// The caller must ensure `error_out` points to a valid mutable pointer.
 pub fn set_error(error_out: *mut *mut c_char, error: &Error) {
     if !error_out.is_null() {
         let error_msg = format!("{}", error);
@@ -117,7 +117,7 @@ pub fn set_error(error_out: *mut *mut c_char, error: &Error) {
 ///
 /// # Safety
 ///
-/// The caller must ensure error_out points to a valid mutable pointer.
+/// The caller must ensure `error_out` points to a valid mutable pointer.
 pub fn clear_error(error_out: *mut *mut c_char) {
     if !error_out.is_null() {
         unsafe {
