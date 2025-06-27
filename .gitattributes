@@ -1,0 +1,5 @@
+platforms/darwin-arm64/*.dylib binary
+platforms/darwin-x64/*.dylib binary
+platforms/linux-arm64-gnu/*.so binary
+platforms/linux-x64-gnu/*.so binary
+platforms/win32-x64-msvc/*.dll binary
