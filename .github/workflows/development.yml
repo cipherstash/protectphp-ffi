@@ -44,6 +44,9 @@ jobs:
             - 'Cargo.lock'
             - 'rust-toolchain.toml'
             - 'crates/**'
+            - 'platforms/**/*.dylib'
+            - 'platforms/**/*.so'
+            - 'platforms/**/*.dll'
 
   check-php-quality:
     name: Check PHP Code Quality
