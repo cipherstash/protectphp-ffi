@@ -239,7 +239,10 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.platform }}
-        path: platforms/${{ matrix.platform }}/
+        path: |
+          platforms/${{ matrix.platform }}/*.dylib
+          platforms/${{ matrix.platform }}/*.so
+          platforms/${{ matrix.platform }}/*.dll
 
   run-php-tests:
     name: Run PHP Tests
@@ -386,16 +389,87 @@ jobs:
       id: source-commit
       run: echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
-    - name: Download all native libraries
+    - name: Download libraries
       uses: actions/download-artifact@v4
       with:
         path: platforms/
 
-    - name: Commit all native libraries
-      uses: getsentry/action-github-commit@v2.0.0
+    - name: Commit libraries
+      uses: actions/github-script@v7
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        message: |
-          build(platforms): update all native libraries
+        script: |
+          const fs = require('fs');
+          const path = require('path');
 
-          Source: ${{ steps.source-commit.outputs.sha }}
+          const findLibraryFiles = (dir) => {
+            const extensions = ['.dylib', '.so', '.dll'];
+            const files = [];
+
+            if (!fs.existsSync(dir)) return files;
+
+            const traverse = (currentDir) => {
+              const items = fs.readdirSync(currentDir, { withFileTypes: true });
+              for (const item of items) {
+                const fullPath = path.join(currentDir, item.name);
+                if (item.isDirectory()) {
+                  traverse(fullPath);
+                } else if (extensions.some(ext => item.name.endsWith(ext))) {
+                  files.push(fullPath);
+                }
+              }
+            };
+
+            traverse(dir);
+
+            return files;
+          };
+
+          const files = findLibraryFiles('platforms');
+
+          if (files.length === 0) return;
+
+          const { data: ref } = await github.rest.git.getRef({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: `heads/${{ github.head_ref }}`
+          });
+
+          const tree = [];
+
+          for (const filePath of files) {
+            const { data: blob } = await github.rest.git.createBlob({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              content: fs.readFileSync(filePath).toString('base64'),
+              encoding: 'base64'
+            });
+            tree.push({
+              path: filePath,
+              mode: '100644',
+              type: 'blob',
+              sha: blob.sha
+            });
+          }
+
+          const { data: newTree } = await github.rest.git.createTree({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            base_tree: ref.object.sha,
+            tree: tree
+          });
+
+          const { data: commit } = await github.rest.git.createCommit({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            message: `build(platforms): update all native libraries\n\nSource: ${{ steps.source-commit.outputs.sha }}`,
+            tree: newTree.sha,
+            parents: [ref.object.sha]
+          });
+
+          await github.rest.git.updateRef({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: `heads/${{ github.head_ref }}`,
+            sha: commit.sha
+          });
