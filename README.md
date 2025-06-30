@@ -493,6 +493,7 @@ For columns configured with the `unique`, `ore`, and/or `match` indexes:
 {
     "k": "ct",
     "c": "mBbM8rvts7^sycKCI!-Y9x2kL8vN...",
+    "dt": "text",
     "hm": "0f4f3b99671e74c0f8b5a1d2e3f4...",
     "ob": null,
     "bf": null,
@@ -510,6 +511,7 @@ Response parameters:
 |-----------|-----------|--------|-------------|
 | `k` | `string` | Always | Key type identifier (always `ct` for ciphertext) |
 | `c` | `string` | Always | Base85-encoded ciphertext containing the encrypted data |
+| `dt` | `string` | Always | Data type for casting (from `cast_as` configuration parameter) |
 | `hm` | `string\|null` | `unique` | HMAC index for exact equality queries and uniqueness constraints |
 | `ob` | `array\|null` | `ore` | Order-revealing encryption index for range queries |
 | `bf` | `array\|null` | `match` | Bloom filter index for full-text search queries |
@@ -524,6 +526,7 @@ For columns configured with the `ste_vec` index:
 {
     "k": "sv",
     "c": "mBbKND$(wyS}0*#KjqS!Is$dX...",
+    "dt": "jsonb",
     "sv": [
         {
             "tokenized_selector": "dd4659b9c279af040dd05ce21b2a22f7",
@@ -546,6 +549,7 @@ Response parameters:
 |-----------|------|--------|-------------|
 | `k` | `string` | Always | Key type identifier (always `sv` for structured vector) |
 | `c` | `string` | Always | Base85-encoded ciphertext containing the encrypted data |
+| `dt` | `string` | Always | Data type for casting (from `cast_as` configuration parameter) |
 | `sv` | `array` | `ste_vec` | Structured text encryption vector for JSONB containment queries |
 | `sv[].tokenized_selector` | `string` | `ste_vec` | Encrypted selector for the JSON path |
 | `sv[].term` | `string` | `ste_vec` | Encrypted term value |
