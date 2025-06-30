@@ -4,7 +4,6 @@ version = "0.1.0"
 license = "ISC"
 edition = "2021"
 rust-version = "1.83.0"
-exclude = ["*.so", "*.dll", "*.dylib"]
 
 [lib]
 crate-type = ["cdylib"]
