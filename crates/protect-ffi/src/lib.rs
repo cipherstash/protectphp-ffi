@@ -19,7 +19,7 @@ use cipherstash_client::{
     schema::ColumnConfig,
     zerokms::{self, EncryptedRecord, WithContext, ZeroKMSWithClientKey},
 };
-use encrypt_config::{EncryptConfig, Identifier};
+use encrypt_config::{CastAs, EncryptConfig, Identifier};
 use libc::c_char;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
@@ -47,7 +47,7 @@ fn runtime() -> Result<&'static Runtime, Error> {
 pub struct Client {
     cipher: Arc<ScopedZeroKMSNoRefresh>,
     zerokms: Arc<ZeroKMSWithClientKey<ServiceCredentials>>,
-    encrypt_config: Arc<HashMap<Identifier, ColumnConfig>>,
+    encrypt_config: Arc<HashMap<Identifier, (ColumnConfig, CastAs)>>,
 }
 
 /// An encrypted value with associated encryption indexes or structured text encryption vectors.
@@ -60,6 +60,9 @@ pub enum Encrypted {
         /// Base85-encoded ciphertext containing the encrypted data.
         #[serde(rename = "c")]
         ciphertext: String,
+        /// Data type for casting.
+        #[serde(rename = "dt")]
+        data_type: String,
         /// HMAC index for exact equality queries and uniqueness constraints.
         #[serde(rename = "hm")]
         unique_index: Option<String>,
@@ -83,6 +86,9 @@ pub enum Encrypted {
         /// Base85-encoded ciphertext containing the encrypted data.
         #[serde(rename = "c")]
         ciphertext: String,
+        /// Data type for casting.
+        #[serde(rename = "dt")]
+        data_type: String,
         /// Structured text encryption vector for JSONB containment queries.
         #[serde(rename = "sv")]
         ste_vec_index: SteVec<16>,
@@ -238,7 +244,7 @@ pub extern "C" fn encrypt(
             };
 
             let ident = Identifier::new(table_str, column_str);
-            let column_config = client
+            let (column_config, cast_as) = client
                 .encrypt_config
                 .get(&ident)
                 .ok_or_else(|| Error::UnknownColumn(ident.clone()))?;
@@ -246,7 +252,8 @@ pub extern "C" fn encrypt(
             let mut plaintext_target = plaintext_target::new(plaintext_str, column_config)?;
             plaintext_target.context = encryption_context;
 
-            let encrypted = encrypt_inner(client.clone(), plaintext_target, ident, None).await?;
+            let encrypted =
+                encrypt_inner(client.clone(), plaintext_target, &ident, cast_as, None).await?;
 
             serde_json::to_string(&encrypted).map_err(Error::from)
         })
@@ -260,7 +267,8 @@ pub extern "C" fn encrypt(
 async fn encrypt_inner(
     client: Client,
     plaintext_target: PlaintextTarget,
-    ident: Identifier,
+    ident: &Identifier,
+    cast_as: &CastAs,
     service_token: Option<ServiceToken>,
 ) -> Result<Encrypted, Error> {
     let mut pipeline = ReferencedPendingPipeline::new(client.cipher);
@@ -275,7 +283,7 @@ async fn encrypt_inner(
         )
     })?;
 
-    to_eql_encrypted(encrypted, &ident)
+    to_eql_encrypted(encrypted, ident, cast_as)
 }
 
 /// Parses JSON encryption context into ZeroKMS context objects.
@@ -411,6 +419,7 @@ fn plaintext_str_from_bytes(bytes: Vec<u8>) -> Result<String, Error> {
 fn to_eql_encrypted(
     encrypted: encryption::Encrypted,
     identifier: &Identifier,
+    cast_as: &CastAs,
 ) -> Result<Encrypted, Error> {
     match encrypted {
         encryption::Encrypted::Record(ciphertext, terms) => {
@@ -455,10 +464,11 @@ fn to_eql_encrypted(
 
             Ok(Encrypted::Ciphertext {
                 ciphertext,
-                identifier: identifier.to_owned(),
+                data_type: cast_as.to_string(),
                 unique_index: indexes.unique_index,
                 ore_index: indexes.ore_index,
                 match_index: indexes.match_index,
+                identifier: identifier.to_owned(),
                 version: 2,
             })
         }
@@ -475,8 +485,9 @@ fn to_eql_encrypted(
 
             Ok(Encrypted::SteVec {
                 ciphertext,
-                identifier: identifier.to_owned(),
+                data_type: cast_as.to_string(),
                 ste_vec_index,
+                identifier: identifier.to_owned(),
                 version: 2,
             })
         }
@@ -578,7 +589,7 @@ pub extern "C" fn encrypt_bulk(
                 };
 
                 let ident = Identifier::new(item.table, item.column);
-                let column_config = client
+                let (column_config, cast_as) = client
                     .encrypt_config
                     .get(&ident)
                     .ok_or_else(|| Error::UnknownColumn(ident.clone()))?;
@@ -586,7 +597,7 @@ pub extern "C" fn encrypt_bulk(
                 let mut plaintext_target = plaintext_target::new(item.plaintext, column_config)?;
                 plaintext_target.context = encryption_context;
 
-                plaintext_targets.push((plaintext_target, ident));
+                plaintext_targets.push((plaintext_target, ident, *cast_as));
             }
 
             let encrypted_results =
@@ -602,36 +613,45 @@ pub extern "C" fn encrypt_bulk(
 
 async fn encrypt_bulk_inner(
     client: Client,
-    plaintext_targets: Vec<(PlaintextTarget, Identifier)>,
+    plaintext_targets: Vec<(PlaintextTarget, Identifier, CastAs)>,
     service_token: Option<ServiceToken>,
 ) -> Result<Vec<Encrypted>, Error> {
     let len = plaintext_targets.len();
     let mut pipeline = ReferencedPendingPipeline::new(client.cipher);
-    let (plaintext_targets, identifiers): (Vec<PlaintextTarget>, Vec<Identifier>) =
-        plaintext_targets.into_iter().unzip();
+    let (plaintext_targets, identifiers, cast_types): (
+        Vec<PlaintextTarget>,
+        Vec<Identifier>,
+        Vec<CastAs>,
+    ) = plaintext_targets.into_iter().fold(
+        (Vec::new(), Vec::new(), Vec::new()),
+        |(mut plaintext_targets, mut identifiers, mut cast_types),
+         (plaintext_target, identifier, cast_type)| {
+            plaintext_targets.push(plaintext_target);
+            identifiers.push(identifier);
+            cast_types.push(cast_type);
+            (plaintext_targets, identifiers, cast_types)
+        },
+    );
 
-    for (i, plaintext_target) in plaintext_targets.into_iter().enumerate() {
-        pipeline.add_with_ref::<PlaintextTarget>(plaintext_target, i)?;
+    for (index, plaintext_target) in plaintext_targets.into_iter().enumerate() {
+        pipeline.add_with_ref::<PlaintextTarget>(plaintext_target, index)?;
     }
 
     let mut source_encrypted = pipeline.encrypt(service_token).await?;
 
     let mut results: Vec<Encrypted> = Vec::with_capacity(len);
 
-    for i in 0..len {
-        let encrypted = source_encrypted.remove(i).ok_or_else(|| {
+    for index in 0..len {
+        let encrypted = source_encrypted.remove(index).ok_or_else(|| {
             Error::InvariantViolation(format!(
-                "`encrypt_bulk` expected a result in the pipeline at index {i}, but there was none"
+                "`encrypt_bulk` expected a result in the pipeline at index {index}, but there was none"
             ))
         })?;
 
-        let ident = identifiers.get(i).ok_or_else(|| {
-            Error::InvariantViolation(format!(
-                "`encrypt_bulk` expected an identifier to exist for index {i}, but there was none"
-            ))
-        })?;
+        let identifier = &identifiers[index];
+        let cast_as = &cast_types[index];
 
-        let eql_payload = to_eql_encrypted(encrypted, ident)?;
+        let eql_payload = to_eql_encrypted(encrypted, identifier, cast_as)?;
 
         results.push(eql_payload);
     }
@@ -750,7 +770,7 @@ pub extern "C" fn create_search_terms(
                 };
 
                 let ident = Identifier::new(term.table, term.column);
-                let column_config = client
+                let (column_config, cast_as) = client
                     .encrypt_config
                     .get(&ident)
                     .ok_or_else(|| Error::UnknownColumn(ident.clone()))?;
@@ -759,7 +779,7 @@ pub extern "C" fn create_search_terms(
                 plaintext_target.context = encryption_context;
 
                 let encrypted =
-                    encrypt_inner(client.clone(), plaintext_target, ident, None).await?;
+                    encrypt_inner(client.clone(), plaintext_target, &ident, cast_as, None).await?;
 
                 let search_term_json = match encrypted {
                     Encrypted::Ciphertext {
@@ -880,33 +900,52 @@ mod lib {
         }
 
         #[test]
-        fn test_encrypted_serialization() {
+        fn test_encrypted_ciphertext_json_format() {
             let identifier = Identifier {
                 table: "users".to_string(),
-                column: "name".to_string(),
+                column: "email".to_string(),
             };
 
             let encrypted = Encrypted::Ciphertext {
-                ciphertext: "test-ciphertext".to_string(),
-                unique_index: Some("unique-hash".to_string()),
-                ore_index: Some(vec!["index1".to_string()]),
-                match_index: Some(vec![1, 2, 3]),
-                identifier: identifier.clone(),
-                version: 1,
+                ciphertext: "abc123".to_string(),
+                data_type: "text".to_string(),
+                unique_index: Some("hash123".to_string()),
+                ore_index: None,
+                match_index: None,
+                identifier,
+                version: 2,
             };
 
-            let serialized = serde_json::to_string(&encrypted).unwrap();
-            let deserialized: Encrypted = serde_json::from_str(&serialized).unwrap();
+            let json = serde_json::to_string(&encrypted).unwrap();
+            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-            match (encrypted, deserialized) {
-                (
-                    Encrypted::Ciphertext { ciphertext: c1, .. },
-                    Encrypted::Ciphertext { ciphertext: c2, .. },
-                ) => {
-                    assert_eq!(c1, c2);
-                }
-                _ => panic!("Serialization/deserialization mismatch"),
-            }
+            assert_eq!(parsed["k"], "ct");
+            assert_eq!(parsed["c"], "abc123");
+            assert_eq!(parsed["dt"], "text");
+            assert_eq!(parsed["hm"], "hash123");
+            assert_eq!(parsed["ob"], serde_json::Value::Null);
+            assert_eq!(parsed["bf"], serde_json::Value::Null);
+            assert_eq!(parsed["v"], 2);
+
+            let identifier = &parsed["i"];
+            assert_eq!(identifier["t"], "users");
+            assert_eq!(identifier["c"], "email");
+        }
+
+        #[test]
+        fn test_encrypted_stevec_json_format() {
+            let json = r#"{"k":"sv","c":"test-ciphertext","dt":"jsonb","sv":[],"i":{"t":"docs","c":"content"},"v":2}"#;
+
+            let parsed: serde_json::Value = serde_json::from_str(json).unwrap();
+            assert_eq!(parsed["k"], "sv");
+            assert_eq!(parsed["c"], "test-ciphertext");
+            assert_eq!(parsed["dt"], "jsonb");
+            assert_eq!(parsed["sv"], serde_json::Value::Array(vec![]));
+            assert_eq!(parsed["v"], 2);
+
+            let identifier = &parsed["i"];
+            assert_eq!(identifier["t"], "docs");
+            assert_eq!(identifier["c"], "content");
         }
 
         #[test]

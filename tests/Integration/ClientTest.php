@@ -107,6 +107,8 @@ class ClientTest extends TestCase
             $this->assertArrayHasKey('c', $result);
             $this->assertIsString($result['c']);
             $this->assertNotEmpty($result['c']);
+            $this->assertArrayHasKey('dt', $result);
+            $this->assertEquals('text', $result['dt']);
             $this->assertArrayHasKey('i', $result);
             $identifier = $result['i'];
             $this->assertIsArray($identifier);
@@ -247,6 +249,8 @@ class ClientTest extends TestCase
             $this->assertArrayHasKey('c', $result);
             $this->assertIsString($result['c']);
             $this->assertNotEmpty($result['c']);
+            $this->assertArrayHasKey('dt', $result);
+            $this->assertEquals('jsonb', $result['dt']);
             $this->assertArrayHasKey('sv', $result);
             $this->assertIsArray($result['sv']);
             $this->assertNotEmpty($result['sv']);
@@ -419,6 +423,8 @@ class ClientTest extends TestCase
             $ciphertext = $result['c'];
             $this->assertIsString($ciphertext);
             $this->assertNotEmpty($ciphertext);
+            $this->assertArrayHasKey('dt', $result);
+            $this->assertEquals('text', $result['dt']);
 
             $decrypted = $client->decrypt($clientPtr, $ciphertext, $contextJson);
             $this->assertEquals($plaintext, $decrypted);
@@ -588,6 +594,8 @@ class ClientTest extends TestCase
             $this->assertArrayHasKey('c', $emailResult);
             $this->assertIsString($emailResult['c']);
             $this->assertNotEmpty($emailResult['c']);
+            $this->assertArrayHasKey('dt', $emailResult);
+            $this->assertEquals('text', $emailResult['dt']);
             $this->assertArrayHasKey('i', $emailResult);
             $emailIdentifier = $emailResult['i'];
             $this->assertIsArray($emailIdentifier);
@@ -601,6 +609,8 @@ class ClientTest extends TestCase
             $this->assertArrayHasKey('c', $ageResult);
             $this->assertIsString($ageResult['c']);
             $this->assertNotEmpty($ageResult['c']);
+            $this->assertArrayHasKey('dt', $ageResult);
+            $this->assertEquals('int', $ageResult['dt']);
             $this->assertArrayHasKey('i', $ageResult);
             $ageIdentifier = $ageResult['i'];
             $this->assertIsArray($ageIdentifier);
@@ -614,6 +624,8 @@ class ClientTest extends TestCase
             $this->assertArrayHasKey('c', $jobTitleResult);
             $this->assertIsString($jobTitleResult['c']);
             $this->assertNotEmpty($jobTitleResult['c']);
+            $this->assertArrayHasKey('dt', $jobTitleResult);
+            $this->assertEquals('text', $jobTitleResult['dt']);
             $this->assertArrayHasKey('i', $jobTitleResult);
             $jobTitleIdentifier = $jobTitleResult['i'];
             $this->assertIsArray($jobTitleIdentifier);
@@ -627,6 +639,8 @@ class ClientTest extends TestCase
             $this->assertArrayHasKey('c', $metadataResult);
             $this->assertIsString($metadataResult['c']);
             $this->assertNotEmpty($metadataResult['c']);
+            $this->assertArrayHasKey('dt', $metadataResult);
+            $this->assertEquals('jsonb', $metadataResult['dt']);
             $this->assertArrayHasKey('sv', $metadataResult);
             $this->assertIsArray($metadataResult['sv']);
             $this->assertNotEmpty($metadataResult['sv']);

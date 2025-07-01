@@ -6,6 +6,7 @@ use cipherstash_client::schema::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
+use strum::Display;
 
 /// Supported schema versions.
 const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[2];
@@ -82,8 +83,9 @@ pub struct Column {
 }
 
 /// Data type casting options for encrypted columns.
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Display)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum CastAs {
     /// Treat as UTF-8 text (default).
     #[default]
@@ -104,6 +106,7 @@ pub enum CastAs {
     Date,
     /// Treat as a JSONB value.
     #[serde(rename = "jsonb")]
+    #[strum(serialize = "jsonb")]
     JsonB,
 }
 
@@ -212,13 +215,13 @@ impl FromStr for EncryptConfig {
 impl EncryptConfig {
     /// Convert the encryption configuration into a [`HashMap`] mapping [`Identifier`] to
     /// [`ColumnConfig`] for fast column lookups.
-    pub fn into_config_map(self) -> HashMap<Identifier, ColumnConfig> {
+    pub fn into_config_map(self) -> HashMap<Identifier, (ColumnConfig, CastAs)> {
         let mut map = HashMap::new();
         for (table_name, columns) in self.tables.into_iter() {
             for (column_name, column) in columns.into_iter() {
-                let column_config = column.into_column_config(&column_name);
+                let column_config = column.clone().into_column_config(&column_name);
                 let key = Identifier::new(&table_name, &column_name);
-                map.insert(key, column_config);
+                map.insert(key, (column_config, column.cast_as));
             }
         }
         map
@@ -263,10 +266,29 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn parse(json: serde_json::Value) -> HashMap<Identifier, ColumnConfig> {
+    fn parse(json: serde_json::Value) -> HashMap<Identifier, (ColumnConfig, CastAs)> {
         serde_json::from_value::<EncryptConfig>(json)
             .map(|config| config.into_config_map())
             .unwrap()
+    }
+
+    #[test]
+    fn test_cast_as_string_representation() {
+        let test_cases = [
+            (CastAs::Text, "text"),
+            (CastAs::Boolean, "boolean"),
+            (CastAs::SmallInt, "small_int"),
+            (CastAs::Int, "int"),
+            (CastAs::BigInt, "big_int"),
+            (CastAs::Real, "real"),
+            (CastAs::Double, "double"),
+            (CastAs::Date, "date"),
+            (CastAs::JsonB, "jsonb"),
+        ];
+
+        for (cast_as, expected_string) in test_cases {
+            assert_eq!(cast_as.to_string(), expected_string);
+        }
     }
 
     #[test]
@@ -284,10 +306,11 @@ mod tests {
 
         let encrypt_config = parse(json);
         let ident = Identifier::new("users", "email");
-        let column = encrypt_config.get(&ident).expect("column exists");
+        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
 
         assert_eq!(column.cast_type, ColumnType::Utf8Str);
         assert_eq!(column.name, "email");
+        assert_eq!(*cast_as, CastAs::Text);
     }
 
     #[test]
@@ -308,7 +331,7 @@ mod tests {
 
         let encrypt_config = parse(json);
         let ident = Identifier::new("users", "email");
-        let column = encrypt_config.get(&ident).expect("column exists");
+        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
 
         assert_eq!(
             column.indexes[0].index_type,
@@ -316,6 +339,8 @@ mod tests {
                 token_filters: vec![]
             }
         );
+
+        assert_eq!(*cast_as, CastAs::Text);
     }
 
     #[test]
@@ -342,7 +367,7 @@ mod tests {
 
         let encrypt_config = parse(json);
         let ident = Identifier::new("users", "username");
-        let column = encrypt_config.get(&ident).expect("column exists");
+        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
 
         assert_eq!(
             column.indexes[0].index_type,
@@ -350,6 +375,8 @@ mod tests {
                 token_filters: vec![TokenFilter::Downcase]
             }
         );
+
+        assert_eq!(*cast_as, CastAs::Text);
     }
 
     #[test]
@@ -370,9 +397,10 @@ mod tests {
 
         let encrypt_config = parse(json);
         let ident = Identifier::new("users", "age");
-        let column = encrypt_config.get(&ident).expect("column exists");
+        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
 
         assert_eq!(column.indexes[0].index_type, IndexType::Ore);
+        assert_eq!(*cast_as, CastAs::Int);
     }
 
     #[test]
@@ -393,7 +421,7 @@ mod tests {
 
         let encrypt_config = parse(json);
         let ident = Identifier::new("users", "notes");
-        let column = encrypt_config.get(&ident).expect("column exists");
+        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
 
         assert_eq!(
             column.indexes[0].index_type,
@@ -405,6 +433,8 @@ mod tests {
                 include_original: false
             }
         );
+
+        assert_eq!(*cast_as, CastAs::Text);
     }
 
     #[test]
@@ -438,7 +468,7 @@ mod tests {
 
         let encrypt_config = parse(json);
         let ident = Identifier::new("users", "description");
-        let column = encrypt_config.get(&ident).expect("column exists");
+        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
 
         assert_eq!(
             column.indexes[0].index_type,
@@ -450,6 +480,8 @@ mod tests {
                 include_original: true
             }
         );
+
+        assert_eq!(*cast_as, CastAs::Text);
     }
 
     #[test]
@@ -472,7 +504,7 @@ mod tests {
 
         let encrypt_config = parse(json);
         let ident = Identifier::new("documents", "content");
-        let column = encrypt_config.get(&ident).expect("column exists");
+        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
 
         assert_eq!(
             column.indexes[0].index_type,
@@ -480,6 +512,8 @@ mod tests {
                 prefix: "documents/content".into()
             }
         );
+
+        assert_eq!(*cast_as, CastAs::JsonB);
     }
 
     #[test]
@@ -501,7 +535,7 @@ mod tests {
 
         let encrypt_config = parse(json);
         let ident = Identifier::new("users", "profile");
-        let column = encrypt_config.get(&ident).expect("column exists");
+        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
 
         assert_eq!(column.indexes.len(), 2);
 
@@ -514,6 +548,8 @@ mod tests {
             column.indexes[1].index_type,
             IndexType::Match { .. }
         ));
+
+        assert_eq!(*cast_as, CastAs::Text);
     }
 
     #[test]
