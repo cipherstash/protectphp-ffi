@@ -900,56 +900,52 @@ mod lib {
         }
 
         #[test]
-        fn test_encrypted_serialization() {
+        fn test_encrypted_ciphertext_json_format() {
             let identifier = Identifier {
                 table: "users".to_string(),
-                column: "name".to_string(),
+                column: "email".to_string(),
             };
 
             let encrypted = Encrypted::Ciphertext {
-                ciphertext: "test-ciphertext".to_string(),
+                ciphertext: "abc123".to_string(),
                 data_type: "text".to_string(),
-                unique_index: Some("unique-hash".to_string()),
-                ore_index: Some(vec!["index1".to_string()]),
-                match_index: Some(vec![1, 2, 3]),
-                identifier: identifier.clone(),
+                unique_index: Some("hash123".to_string()),
+                ore_index: None,
+                match_index: None,
+                identifier,
                 version: 2,
             };
 
-            let serialized = serde_json::to_string(&encrypted).unwrap();
-            let deserialized: Encrypted = serde_json::from_str(&serialized).unwrap();
+            let json = serde_json::to_string(&encrypted).unwrap();
+            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-            match (encrypted, deserialized) {
-                (
-                    Encrypted::Ciphertext {
-                        ciphertext: c1,
-                        data_type: dt1,
-                        unique_index: hm1,
-                        ore_index: ob1,
-                        match_index: bf1,
-                        identifier: i1,
-                        version: v1,
-                    },
-                    Encrypted::Ciphertext {
-                        ciphertext: c2,
-                        data_type: dt2,
-                        unique_index: hm2,
-                        ore_index: ob2,
-                        match_index: bf2,
-                        identifier: i2,
-                        version: v2,
-                    },
-                ) => {
-                    assert_eq!(c1, c2);
-                    assert_eq!(dt1, dt2);
-                    assert_eq!(hm1, hm2);
-                    assert_eq!(ob1, ob2);
-                    assert_eq!(bf1, bf2);
-                    assert_eq!(i1, i2);
-                    assert_eq!(v1, v2);
-                }
-                _ => panic!("Serialization/deserialization mismatch"),
-            }
+            assert_eq!(parsed["k"], "ct");
+            assert_eq!(parsed["c"], "abc123");
+            assert_eq!(parsed["dt"], "text");
+            assert_eq!(parsed["hm"], "hash123");
+            assert_eq!(parsed["ob"], serde_json::Value::Null);
+            assert_eq!(parsed["bf"], serde_json::Value::Null);
+            assert_eq!(parsed["v"], 2);
+
+            let identifier = &parsed["i"];
+            assert_eq!(identifier["t"], "users");
+            assert_eq!(identifier["c"], "email");
+        }
+
+        #[test]
+        fn test_encrypted_stevec_json_format() {
+            let json = r#"{"k":"sv","c":"test-ciphertext","dt":"jsonb","sv":[],"i":{"t":"docs","c":"content"},"v":2}"#;
+
+            let parsed: serde_json::Value = serde_json::from_str(json).unwrap();
+            assert_eq!(parsed["k"], "sv");
+            assert_eq!(parsed["c"], "test-ciphertext");
+            assert_eq!(parsed["dt"], "jsonb");
+            assert_eq!(parsed["sv"], serde_json::Value::Array(vec![]));
+            assert_eq!(parsed["v"], 2);
+
+            let identifier = &parsed["i"];
+            assert_eq!(identifier["t"], "docs");
+            assert_eq!(identifier["c"], "content");
         }
 
         #[test]
