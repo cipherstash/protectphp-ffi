@@ -633,34 +633,25 @@ async fn encrypt_bulk_inner(
         },
     );
 
-    for (i, plaintext_target) in plaintext_targets.into_iter().enumerate() {
-        pipeline.add_with_ref::<PlaintextTarget>(plaintext_target, i)?;
+    for (index, plaintext_target) in plaintext_targets.into_iter().enumerate() {
+        pipeline.add_with_ref::<PlaintextTarget>(plaintext_target, index)?;
     }
 
     let mut source_encrypted = pipeline.encrypt(service_token).await?;
 
     let mut results: Vec<Encrypted> = Vec::with_capacity(len);
 
-    for i in 0..len {
-        let encrypted = source_encrypted.remove(i).ok_or_else(|| {
+    for index in 0..len {
+        let encrypted = source_encrypted.remove(index).ok_or_else(|| {
             Error::InvariantViolation(format!(
-                "`encrypt_bulk` expected a result in the pipeline at index {i}, but there was none"
+                "`encrypt_bulk` expected a result in the pipeline at index {index}, but there was none"
             ))
         })?;
 
-        let ident = identifiers.get(i).ok_or_else(|| {
-            Error::InvariantViolation(format!(
-                "`encrypt_bulk` expected an identifier to exist for index {i}, but there was none"
-            ))
-        })?;
+        let identifier = &identifiers[index];
+        let cast_as = &cast_types[index];
 
-        let cast_as = cast_types.get(i).ok_or_else(|| {
-            Error::InvariantViolation(format!(
-                "`encrypt_bulk` expected a cast_as to exist for index {i}, but there was none"
-            ))
-        })?;
-
-        let eql_payload = to_eql_encrypted(encrypted, ident, cast_as)?;
+        let eql_payload = to_eql_encrypted(encrypted, identifier, cast_as)?;
 
         results.push(eql_payload);
     }
