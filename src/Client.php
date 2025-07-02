@@ -220,13 +220,13 @@ class Client
     /**
      * Execute an FFI operation with error handling.
      *
-     * @param  callable(\FFI\CData $errorPtr): ?\FFI\CData  $ffiCall
+     * @param  callable(\FFI\CData $errorPtr): ?\FFI\CData  $operation
      * @param  callable(string $message): FFIException  $createException
      * @return \FFI\CData FFI pointer result
      *
      * @throws FFIException When client is not initialized or FFI operation fails
      */
-    private function executeFFIOperation(callable $ffiCall, callable $createException): \FFI\CData
+    private function executeFFIOperation(callable $operation, callable $createException): \FFI\CData
     {
         if (! $this->isInitialized()) {
             throw FFIException::clientNotInitialized();
@@ -235,7 +235,7 @@ class Client
         $errorPtr = $this->createStringPointer();
 
         try {
-            $result = $ffiCall($errorPtr);
+            $result = $operation($errorPtr);
 
             if ($result === null) {
                 $message = $this->convertStringPointer($errorPtr);
