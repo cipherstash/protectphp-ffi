@@ -494,7 +494,7 @@ mod tests {
                         "cast_as": "jsonb",
                         "indexes": {
                             "ste_vec": {
-                                "prefix": "documents/content"
+                                "prefix": "documents.content"
                             }
                         }
                     }
@@ -509,7 +509,7 @@ mod tests {
         assert_eq!(
             column.indexes[0].index_type,
             IndexType::SteVec {
-                prefix: "documents/content".into()
+                prefix: "documents.content".into()
             }
         );
 

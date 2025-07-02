@@ -41,7 +41,7 @@ class ClientTest extends TestCase
                         'cast_as' => 'jsonb',
                         'indexes' => [
                             'ste_vec' => [
-                                'prefix' => 'users/metadata',
+                                'prefix' => 'users.metadata',
                             ],
                         ],
                     ],
