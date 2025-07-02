@@ -346,7 +346,7 @@ Basic usage:
         'cast_as' => 'jsonb',
         'indexes' => [
             'ste_vec' => [
-                'prefix' => 'patient_records/health_assessment',
+                'prefix' => 'patient_records.health_assessment',
             ],
         ],
     ],
@@ -357,7 +357,7 @@ Configuration parameters:
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `prefix` | `string` | ✓ | - | Unique identifier prefix for the encryption context (recommended format is `table_name/column_name`) |
+| `prefix` | `string` | ✓ | - | Unique identifier prefix for the encryption context (recommended format is `table_name.column_name`) |
 
 Example SQL queries:
 
@@ -414,7 +414,7 @@ $config = [
                 'cast_as' => 'jsonb',
                 'indexes' => [
                     'ste_vec' => [
-                        'prefix' => 'patient_records/health_assessment',
+                        'prefix' => 'patient_records.health_assessment',
                     ],
                 ],
             ],
