@@ -249,12 +249,12 @@ pub extern "C" fn encrypt(
     let result: Result<String, Error> = runtime().and_then(|rt| {
         rt.block_on(async {
             let client = safe_ffi::client_ref(client)?;
-            let plaintext_str = safe_ffi::c_str_to_string(plaintext)?;
-            let column_str = safe_ffi::c_str_to_string(column)?;
-            let table_str = safe_ffi::c_str_to_string(table)?;
-            let context_str = safe_ffi::optional_c_str_to_string(context_json)?;
+            let plaintext = safe_ffi::c_str_to_string(plaintext)?;
+            let column = safe_ffi::c_str_to_string(column)?;
+            let table = safe_ffi::c_str_to_string(table)?;
+            let context = safe_ffi::optional_c_str_to_string(context_json)?;
 
-            let encryption_context = if let Some(context) = context_str {
+            let encryption_context = if let Some(context) = context {
                 parse_encryption_context(&context)?
             } else {
                 Vec::new()
@@ -266,7 +266,7 @@ pub extern "C" fn encrypt(
                 .get(&ident)
                 .ok_or_else(|| Error::UnknownColumn(ident.clone()))?;
 
-            let mut plaintext_target = plaintext_target::new(plaintext_str, column_config)?;
+            let mut plaintext_target = plaintext_target::new(plaintext, column_config)?;
             plaintext_target.context = encryption_context;
 
             let encrypted =
@@ -311,8 +311,8 @@ fn parse_encryption_context(context_json: &str) -> Result<Vec<zerokms::Context>,
     if let Some(identity_claim) = context.get("identity_claim") {
         if let Some(claims_array) = identity_claim.as_array() {
             for claim in claims_array {
-                if let Some(claim_str) = claim.as_str() {
-                    encryption_context.push(zerokms::Context::new_identity_claim(claim_str));
+                if let Some(claim) = claim.as_str() {
+                    encryption_context.push(zerokms::Context::new_identity_claim(claim));
                 }
             }
         }
@@ -321,8 +321,8 @@ fn parse_encryption_context(context_json: &str) -> Result<Vec<zerokms::Context>,
     if let Some(tags) = context.get("tag") {
         if let Some(tags_array) = tags.as_array() {
             for tag in tags_array {
-                if let Some(tag_str) = tag.as_str() {
-                    encryption_context.push(zerokms::Context::new_tag(tag_str));
+                if let Some(tag) = tag.as_str() {
+                    encryption_context.push(zerokms::Context::new_tag(tag));
                 }
             }
         }
@@ -367,17 +367,17 @@ pub extern "C" fn decrypt(
     let result: Result<String, Error> = runtime().and_then(|rt| {
         rt.block_on(async {
             let client = safe_ffi::client_ref(client)?;
-            let ciphertext_str = safe_ffi::c_str_to_string(ciphertext)?;
-            let context_str = safe_ffi::optional_c_str_to_string(context_json)?;
+            let ciphertext = safe_ffi::c_str_to_string(ciphertext)?;
+            let context = safe_ffi::optional_c_str_to_string(context_json)?;
 
-            let encryption_context = if let Some(context) = context_str {
+            let encryption_context = if let Some(context) = context {
                 parse_encryption_context(&context)?
             } else {
                 Vec::new()
             };
 
             let plaintext =
-                decrypt_inner(client.clone(), ciphertext_str, encryption_context, None).await?;
+                decrypt_inner(client.clone(), ciphertext, encryption_context, None).await?;
             Ok(plaintext)
         })
     });
@@ -400,7 +400,7 @@ async fn decrypt_inner(
         .decrypt_single(encrypted_record, service_token)
         .await?;
 
-    plaintext_str_from_bytes(decrypted)
+    plaintext_from_bytes(decrypted)
 }
 
 fn encrypted_record_from_mp_base85(
@@ -418,7 +418,7 @@ fn encrypted_record_from_mp_base85(
     })
 }
 
-fn plaintext_str_from_bytes(bytes: Vec<u8>) -> Result<String, Error> {
+fn plaintext_from_bytes(bytes: Vec<u8>) -> Result<String, Error> {
     let plaintext = Plaintext::from_slice(bytes.as_slice())?;
 
     match plaintext {
@@ -764,7 +764,7 @@ async fn decrypt_bulk_inner(
     let mut plaintexts: Vec<String> = Vec::with_capacity(len);
 
     for item in decrypted {
-        plaintexts.push(plaintext_str_from_bytes(item)?);
+        plaintexts.push(plaintext_from_bytes(item)?);
     }
 
     Ok(plaintexts)
