@@ -9,7 +9,7 @@
 #include <stdint.h>
 
 typedef struct Client Client;
-Client* new_client(const char* config_str, char** error_out);
+Client* new_client(const char* config_json, char** error_out);
 char* encrypt(const Client* client, const char* plaintext, const char* column, const char* table, const char* context_json, char** error_out);
 char* decrypt(const Client* client, const char* ciphertext, const char* context_json, char** error_out);
 char* encrypt_bulk(const Client* client, const char* items_json, char** error_out);

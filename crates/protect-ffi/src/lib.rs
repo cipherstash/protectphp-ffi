@@ -180,22 +180,22 @@ struct ClientConfig {
 ///
 /// # Errors
 ///
-/// Returns an error if the `config_str` is invalid JSON, contains unsupported
+/// Returns an error if the `config_json` is invalid JSON, contains unsupported
 /// encryption options, or if the client cannot be initialized.
 ///
 /// # Safety
 ///
-/// The caller must ensure `config_str` points to a valid null-terminated C string.
+/// The caller must ensure `config_json` points to a valid null-terminated C string.
 /// The returned pointer must be freed using [`free_client()`].
 #[no_mangle]
 pub extern "C" fn new_client(
-    config_str: *const c_char,
+    config_json: *const c_char,
     error_out: *mut *mut c_char,
 ) -> *mut Client {
     let result: Result<Box<Client>, Error> = runtime().and_then(|rt| {
         rt.block_on(async {
-            let config_str = safe_ffi::c_str_to_string(config_str)?;
-            let encrypt_config = EncryptConfig::from_str(&config_str)?;
+            let config_json = safe_ffi::c_str_to_string(config_json)?;
+            let encrypt_config = EncryptConfig::from_str(&config_json)?;
             let client = new_client_inner(encrypt_config).await?;
             Ok(Box::new(client))
         })
