@@ -1,7 +1,7 @@
 /**
  * C interface for the Protect.php FFI library.
  *
- * This header provides the C interface for the CipherStash Client,
+ * This header provides the C interface for the CipherStash Client SDK,
  * enabling integration through PHP's Foreign Function Interface (FFI).
  * All functions declared here are exposed by the underlying Rust library.
  */

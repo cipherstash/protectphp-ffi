@@ -181,7 +181,7 @@ WHERE eql_v2.hmac_256(email) = eql_v2.hmac_256(
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
 SELECT * FROM patient_records 
 WHERE eql_v2.hmac_256(email) = eql_v2.hmac_256(
-  '{"hm":"0f4f3b99671e74c0f8b5a1d2e3f4...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"}}'
+  '{"hm":"0f4f3b99671e74c0f8b5a1d2e3f4a5b6c7d8...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"}}'
 );
 ```
 
@@ -225,7 +225,7 @@ WHERE eql_v2.ore_block_u64_8_256(systolic_bp) = eql_v2.ore_block_u64_8_256(
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
 SELECT * FROM patient_records 
 WHERE eql_v2.ore_block_u64_8_256(systolic_bp) = eql_v2.ore_block_u64_8_256(
-  '{"hm":null,"ob":["0x1a2b3c..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'
+  '{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'
 );
 
 -- Find patients with blood pressure above specified threshold
@@ -238,7 +238,7 @@ WHERE eql_v2.ore_block_u64_8_256(systolic_bp) >= eql_v2.ore_block_u64_8_256(
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
 SELECT * FROM patient_records 
 WHERE eql_v2.ore_block_u64_8_256(systolic_bp) >= eql_v2.ore_block_u64_8_256(
-  '{"hm":null,"ob":["0x1a2b3c..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'
+  '{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'
 );
 
 -- Find patients with blood pressure in specified range
@@ -251,8 +251,8 @@ WHERE eql_v2.ore_block_u64_8_256(systolic_bp) BETWEEN
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
 SELECT * FROM patient_records 
 WHERE eql_v2.ore_block_u64_8_256(systolic_bp) BETWEEN 
-      eql_v2.ore_block_u64_8_256('{"hm":null,"ob":["0x1f5e2d..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}') 
-  AND eql_v2.ore_block_u64_8_256('{"hm":null,"ob":["0x9c8b7a..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}');
+      eql_v2.ore_block_u64_8_256('{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}') 
+  AND eql_v2.ore_block_u64_8_256('{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}');
 
 -- Order patients by blood pressure from lowest to highest
 SELECT * FROM patient_records 
@@ -330,7 +330,7 @@ WHERE eql_v2.bloom_filter(medical_notes) @> eql_v2.bloom_filter(
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
 SELECT * FROM patient_records 
 WHERE eql_v2.bloom_filter(medical_notes) @> eql_v2.bloom_filter(
-  '{"hm":null,"ob":null,"bf":[142,891,1337,1847,2001],"i":{"t":"patient_records","c":"medical_notes"}}'
+  '{"hm":null,"ob":null,"bf":[1397,378,1463,1673,1474,1226],"i":{"t":"patient_records","c":"medical_notes"}}'
 );
 ```
 
@@ -346,7 +346,7 @@ Basic usage:
         'cast_as' => 'jsonb',
         'indexes' => [
             'ste_vec' => [
-                'prefix' => 'patient_records/health_assessment',
+                'prefix' => 'patient_records.health_assessment',
             ],
         ],
     ],
@@ -357,7 +357,7 @@ Configuration parameters:
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `prefix` | `string` | ✓ | - | Unique identifier prefix for the encryption context (recommended format is `table_name/column_name`) |
+| `prefix` | `string` | ✓ | - | Domain separator for cryptographic hashing that must be unique per column (recommended format is `table_name.column_name`) |
 
 Example SQL queries:
 
@@ -369,12 +369,12 @@ WHERE cs_ste_vec_v2(health_assessment, '{"conditions":["diabetes","hypertension"
 
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
 SELECT * FROM patient_records 
-WHERE health_assessment @> '{"sv":[{"tokenized_selector":"dd4659b9c279af040dd05ce21b2a22f7","term":"00a6343301fae638379a8b1f9147eda082","record":"mBbLOIqSF%n4>5ajY+w?-+!*eKqJt(|G8c0rEaxnXm!MLTLGT0tuse(H;lHjz!hWQpW&^_vF3;xdm^M%l{vX7mB05%=#-7DSapsQ$y(uxxWphCxN}>hI__Q00^;tc;bvpcK_`<{cx)595mX{~O#Z^4zy","parent_is_array":false}],"i":{"t":"patient_records","c":"health_assessment"}}';
+WHERE health_assessment @> '{"sv":[{"s":"dd4659b9c279af040dd05ce21b2a22f7...","t":"22303061363334333330316661653633...","r":"mBbL}QHJ&a(@rwS5n)u^G+Fb+t}Soo-h...","pa":false}],"i":{"t":"patient_records","c":"health_assessment"}}';
 
 -- Find records where encrypted data is contained by specified values
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
 SELECT * FROM patient_records 
-WHERE health_assessment <@ '{"sv":[{"tokenized_selector":"cff40d3394bcb913237661f679280999","term":"022d3a7feb298b2d93b9f3a2cd0c0bebf8c524b8a991f9eedfbfe52477fe7b3817de6ae2fec499e5b3e7b0a5daefc88ea45923e2cc5c6658c18f477f7eb6542106","record":"mBbLOIqSF%n4>5ajY+w?-+!*e9B5XGJ%B#Hphr%zC1ge&;+sJ+zW5p~UC^A%;KU#qxN}>hI__Q00^;tc;bvpcK_`<{cx)595mX{~O#Z^4zy","parent_is_array":false}],"i":{"t":"patient_records","c":"health_assessment"}}';
+WHERE health_assessment <@ '{"sv":[{"s":"df08a4c4157bdb5bf6fa9be89cf18d10...","t":"22303063343133306135646334356130...","r":"mBbL}QHJ&a(@rwS5n)u^G+Fb+Ex8ofB!...","pa":false}],"i":{"t":"patient_records","c":"health_assessment"}}';
 ```
 
 This index differs from other indexes in its query patterns. Plaintext queries use `cs_ste_vec_v2()` with JSON data and only support the PostgreSQL `@>` operator, while search term queries can use both PostgreSQL `@>` and `<@` operators with pre-computed vectors from the `sv` response field in the search terms response.
@@ -414,7 +414,7 @@ $config = [
                 'cast_as' => 'jsonb',
                 'indexes' => [
                     'ste_vec' => [
-                        'prefix' => 'patient_records/health_assessment',
+                        'prefix' => 'patient_records.health_assessment',
                     ],
                 ],
             ],
@@ -472,7 +472,7 @@ try {
     $ciphertext = $result['c'];
 
     echo $ciphertext;
-    // mBbM8rvts7^sycKCI!-Y9x2kL8vN...
+    // mBbKlk}G7QdaGiNj$dL7#+AOrA^}*VJx...
 } finally {
     $client->freeClient($clientPtr);
 }
@@ -492,9 +492,9 @@ For columns configured with the `unique`, `ore`, and/or `match` indexes:
 ```json
 {
     "k": "ct",
-    "c": "mBbM8rvts7^sycKCI!-Y9x2kL8vN...",
+    "c": "mBbKlk}G7QdaGiNj$dL7#+AOrA^}*VJx...",
     "dt": "text",
-    "hm": "0f4f3b99671e74c0f8b5a1d2e3f4...",
+    "hm": "f3ca71fd39ae9d3d1d1fc25141bcb6da...",
     "ob": null,
     "bf": null,
     "i": {
@@ -525,14 +525,14 @@ For columns configured with the `ste_vec` index:
 ```json
 {
     "k": "sv",
-    "c": "mBbKND$(wyS}0*#KjqS!Is$dX...",
+    "c": "mBbLQ2^Io|1eh_K2*n^LSCVVQuGhkL>w...",
     "dt": "jsonb",
     "sv": [
         {
-            "tokenized_selector": "dd4659b9c279af040dd05ce21b2a22f7",
-            "term": "00a6343301fae638379a8b1f9147eda082",
-            "record": "mBbKND$(wyS}0*#KjqS!Is$dX...",
-            "parent_is_array": false
+            "s": "dd4659b9c279af040dd05ce21b2a22f7...",
+            "t": "22303061363334333330316661653633...",
+            "r": "mBbLQ2^Io|1eh_K2*n^LSCVVQuGhkL>w...",
+            "pa": false
         }
     ],
     "i": {
@@ -551,10 +551,10 @@ Response parameters:
 | `c` | `string` | Always | Base85-encoded ciphertext containing the encrypted data |
 | `dt` | `string` | Always | Data type for casting (from `cast_as` configuration parameter) |
 | `sv` | `array` | `ste_vec` | Structured text encryption vector for JSONB containment queries |
-| `sv[].tokenized_selector` | `string` | `ste_vec` | Encrypted selector for the JSON path |
-| `sv[].term` | `string` | `ste_vec` | Encrypted term value |
-| `sv[].record` | `string` | `ste_vec` | Base85-encoded encrypted record data |
-| `sv[].parent_is_array` | `boolean` | `ste_vec` | Whether the parent JSON element is an array |
+| `sv[].s` | `string` | `ste_vec` | Tokenized selector representing the encrypted JSON path to the value |
+| `sv[].t` | `string` | `ste_vec` | Encrypted term value for equality and order-preserving queries |
+| `sv[].r` | `string` | `ste_vec` | Base85-encoded ciphertext containing the encrypted record data |
+| `sv[].pa` | `boolean` | `ste_vec` | Whether the parent JSON element is an array |
 | `i` | `object` | Always | Table and column identifier for this encrypted value: `{"t":"table_name","c":"column_name"}` |
 | `v` | `int` | Always | Schema version for backward compatibility |
 
@@ -792,7 +792,7 @@ try {
         $ciphertext = $encryptedData['c'];
 
         echo $ciphertext;
-        // mBbM8rvts7^sycKCI!-Y9x2kL8vN...
+        // mBbKuXT|+vBh~K2WV-!n5_W3DBFd4`Mp...
     }
 } finally {
     $client->freeClient($clientPtr);
@@ -859,7 +859,7 @@ try {
     $ciphertextItemsJson = json_encode($ciphertextItems, JSON_THROW_ON_ERROR);
 
     echo $ciphertextItemsJson;
-    // [{"ciphertext":"mBbM8rvts7^sycKCI!-Y9x2kL8vN..."},{"ciphertext":"nCcN9swus8^tzdLDJ!-Z0y3lM9wO..."}]
+    // [{"ciphertext":"mBbK>BcAYctW$Gy)vK2)Y$&nBBKz{oL1..."},{"ciphertext":"mBbJ<8tOEI+Z`KFUV`q&kmdWtO#DKxW|..."}]
 
     $decryptedResultJson = $client->decryptBulk($clientPtr, $ciphertextItemsJson);
 
@@ -926,7 +926,7 @@ try {
 
     foreach ($result as $searchTerms) {
         echo json_encode($searchTerms);
-        // {"hm":"0f4f3b99671e74c0f8b5a1d2e3f4...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"}}
+        // {"hm":"f3ca71fd39ae9d3d1d1fc25141bcb6da...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"}}
     }
 } finally {
     $client->freeClient($clientPtr);
@@ -945,7 +945,7 @@ For columns configured with `unique`, `ore`, and/or `match` indexes:
 
 ```json
 {
-    "hm": "0f4f3b99671e74c0f8b5a1d2e3f4...",
+    "hm": "f3ca71fd39ae9d3d1d1fc25141bcb6da...",
     "ob": null,
     "bf": null,
     "i": {
@@ -972,16 +972,16 @@ For columns configured with `ste_vec` indexes:
 {
     "sv": [
         {
-            "tokenized_selector": "dd4659b9c279af040dd05ce21b2a22f7",
-            "term": "00a6343301fae638379a8b1f9147eda082",
-            "record": "mBbM0GYe4Wa7OJ<2HG_ZQ42Z5KmmLn7{+K)z~e9h*+$l...",
-            "parent_is_array": false
+            "s": "dd4659b9c279af040dd05ce21b2a22f7...",
+            "t": "22303061363334333330316661653633...",
+            "r": "mBbLkCZcaJ2U|G333rRC>f;r}uFEp7Tg...",
+            "pa": false
         },
         {
-            "tokenized_selector": "cff40d3394bcb913237661f679280999",
-            "term": "022d3a7feb298b2d93b9f3a2cd0c0bebf8c524b8a991...",
-            "record": "mBbM0GYe4Wa7OJ<2HG_ZQ42Z59Mj-WD;uRkcn7ZHj&a4...",
-            "parent_is_array": false
+            "s": "df08a4c4157bdb5bf6fa9be89cf18d10...",
+            "t": "22303063343133306135646334356130...",
+            "r": "mBbLkCZcaJ2U|G333rRC>f;r}E&d@?`;...",
+            "pa": false
         }
     ],
     "i": {
@@ -996,10 +996,10 @@ Response parameters:
 | Parameter | Type | Source | Description |
 |-----------|------|--------|-------------|
 | `sv` | `array` | `ste_vec` | Structured text encryption vector for JSONB containment queries |
-| `sv[].tokenized_selector` | `string` | `ste_vec` | Encrypted selector for the JSON path |
-| `sv[].term` | `string` | `ste_vec` | Encrypted term value |
-| `sv[].record` | `string` | `ste_vec` | Base85-encoded encrypted record data |
-| `sv[].parent_is_array` | `boolean` | `ste_vec` | Whether the parent JSON element is an array |
+| `sv[].s` | `string` | `ste_vec` | Tokenized selector representing the encrypted JSON path to the value |
+| `sv[].t` | `string` | `ste_vec` | Encrypted term value for equality and order-preserving queries |
+| `sv[].r` | `string` | `ste_vec` | Base85-encoded ciphertext containing the encrypted record data |
+| `sv[].pa` | `boolean` | `ste_vec` | Whether the parent JSON element is an array |
 | `i` | `object` | Always | Table and column identifier for this encrypted value: `{"t":"table_name","c":"column_name"}` |
 
 ### Error Handling
@@ -1045,7 +1045,7 @@ try {
     $ciphertext = $result['c'];
 
     echo $ciphertext;
-    // mBbM8rvts7^sycKCI!-Y9x2kL8vN...
+    // mBbKlk}G7QdaGiNj$dL7#+AOrA^}*VJx...
 } catch (FFIException $e) {
     error_log($e->getMessage());
 

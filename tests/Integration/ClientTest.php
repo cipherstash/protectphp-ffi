@@ -41,7 +41,7 @@ class ClientTest extends TestCase
                         'cast_as' => 'jsonb',
                         'indexes' => [
                             'ste_vec' => [
-                                'prefix' => 'users/metadata',
+                                'prefix' => 'users.metadata',
                             ],
                         ],
                     ],
@@ -647,17 +647,17 @@ class ClientTest extends TestCase
 
             foreach ($metadataResult['sv'] as $svEntry) {
                 $this->assertIsArray($svEntry);
-                $this->assertArrayHasKey('tokenized_selector', $svEntry);
-                $this->assertArrayHasKey('term', $svEntry);
-                $this->assertArrayHasKey('record', $svEntry);
-                $this->assertArrayHasKey('parent_is_array', $svEntry);
-                $this->assertIsString($svEntry['tokenized_selector']);
-                $this->assertIsString($svEntry['term']);
-                $this->assertIsString($svEntry['record']);
-                $this->assertIsBool($svEntry['parent_is_array']);
-                $this->assertNotEmpty($svEntry['tokenized_selector']);
-                $this->assertNotEmpty($svEntry['term']);
-                $this->assertNotEmpty($svEntry['record']);
+                $this->assertArrayHasKey('s', $svEntry);
+                $this->assertArrayHasKey('t', $svEntry);
+                $this->assertArrayHasKey('r', $svEntry);
+                $this->assertArrayHasKey('pa', $svEntry);
+                $this->assertIsString($svEntry['s']);
+                $this->assertIsString($svEntry['t']);
+                $this->assertIsString($svEntry['r']);
+                $this->assertIsBool($svEntry['pa']);
+                $this->assertNotEmpty($svEntry['s']);
+                $this->assertNotEmpty($svEntry['t']);
+                $this->assertNotEmpty($svEntry['r']);
             }
 
             $this->assertArrayHasKey('i', $metadataResult);
