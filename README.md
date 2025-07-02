@@ -357,7 +357,7 @@ Configuration parameters:
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `prefix` | `string` | ✓ | - | Unique identifier prefix for the encryption context (recommended format is `table_name.column_name`) |
+| `prefix` | `string` | ✓ | - | Domain separator for cryptographic hashing that must be unique per column (recommended format is `table_name.column_name`) |
 
 Example SQL queries:
 
