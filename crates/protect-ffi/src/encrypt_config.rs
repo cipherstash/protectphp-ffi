@@ -230,7 +230,7 @@ impl EncryptConfig {
 
 impl Column {
     /// Convert this column configuration into a [`ColumnConfig`].
-    pub fn into_column_config(self, name: &String) -> ColumnConfig {
+    pub fn into_column_config(self, name: &str) -> ColumnConfig {
         let mut config = ColumnConfig::build(name.to_string()).casts_as(self.cast_as.into());
 
         if let Some(opts) = self.indexes.unique_index {
@@ -305,8 +305,8 @@ mod tests {
         });
 
         let encrypt_config = parse(json);
-        let ident = Identifier::new("users", "email");
-        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
+        let identifier = Identifier::new("users", "email");
+        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
 
         assert_eq!(column.cast_type, ColumnType::Utf8Str);
         assert_eq!(column.name, "email");
@@ -330,8 +330,8 @@ mod tests {
         });
 
         let encrypt_config = parse(json);
-        let ident = Identifier::new("users", "email");
-        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
+        let identifier = Identifier::new("users", "email");
+        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
 
         assert_eq!(
             column.indexes[0].index_type,
@@ -366,8 +366,8 @@ mod tests {
         });
 
         let encrypt_config = parse(json);
-        let ident = Identifier::new("users", "username");
-        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
+        let identifier = Identifier::new("users", "username");
+        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
 
         assert_eq!(
             column.indexes[0].index_type,
@@ -396,8 +396,8 @@ mod tests {
         });
 
         let encrypt_config = parse(json);
-        let ident = Identifier::new("users", "age");
-        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
+        let identifier = Identifier::new("users", "age");
+        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
 
         assert_eq!(column.indexes[0].index_type, IndexType::Ore);
         assert_eq!(*cast_as, CastAs::Int);
@@ -420,8 +420,8 @@ mod tests {
         });
 
         let encrypt_config = parse(json);
-        let ident = Identifier::new("users", "notes");
-        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
+        let identifier = Identifier::new("users", "notes");
+        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
 
         assert_eq!(
             column.indexes[0].index_type,
@@ -467,8 +467,8 @@ mod tests {
         });
 
         let encrypt_config = parse(json);
-        let ident = Identifier::new("users", "description");
-        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
+        let identifier = Identifier::new("users", "description");
+        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
 
         assert_eq!(
             column.indexes[0].index_type,
@@ -503,8 +503,8 @@ mod tests {
         });
 
         let encrypt_config = parse(json);
-        let ident = Identifier::new("documents", "content");
-        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
+        let identifier = Identifier::new("documents", "content");
+        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
 
         assert_eq!(
             column.indexes[0].index_type,
@@ -534,8 +534,8 @@ mod tests {
         });
 
         let encrypt_config = parse(json);
-        let ident = Identifier::new("users", "profile");
-        let (column, cast_as) = encrypt_config.get(&ident).expect("column exists");
+        let identifier = Identifier::new("users", "profile");
+        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
 
         assert_eq!(column.indexes.len(), 2);
 

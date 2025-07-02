@@ -32,13 +32,13 @@ pub fn client_ref<'a>(client: *const Client) -> Result<&'a Client, Error> {
 /// # Safety
 ///
 /// The caller must ensure the pointer points to a valid null-terminated C string.
-pub fn c_str_to_string(s: *const c_char) -> Result<String, Error> {
-    if s.is_null() {
+pub fn c_str_to_string(c_string_ptr: *const c_char) -> Result<String, Error> {
+    if c_string_ptr.is_null() {
         Err(Error::NullPointer)
     } else {
         unsafe {
-            let c_str = CStr::from_ptr(s);
-            Ok(c_str.to_str()?.to_owned())
+            let c_string = CStr::from_ptr(c_string_ptr);
+            Ok(c_string.to_str()?.to_owned())
         }
     }
 }
@@ -52,11 +52,11 @@ pub fn c_str_to_string(s: *const c_char) -> Result<String, Error> {
 /// # Safety
 ///
 /// If not null, the caller must ensure the pointer points to a valid null-terminated C string.
-pub fn optional_c_str_to_string(s: *const c_char) -> Result<Option<String>, Error> {
-    if s.is_null() {
+pub fn optional_c_str_to_string(c_string_ptr: *const c_char) -> Result<Option<String>, Error> {
+    if c_string_ptr.is_null() {
         Ok(None)
     } else {
-        Ok(Some(c_str_to_string(s)?))
+        Ok(Some(c_str_to_string(c_string_ptr)?))
     }
 }
 
@@ -65,8 +65,8 @@ pub fn optional_c_str_to_string(s: *const c_char) -> Result<Option<String>, Erro
 /// # Errors
 ///
 /// Returns [`Error::StringConversion`] if the string contains null bytes.
-pub fn string_to_c_str(s: String) -> Result<*mut c_char, Error> {
-    CString::new(s)
+pub fn string_to_c_str(string: String) -> Result<*mut c_char, Error> {
+    CString::new(string)
         .map(|cs| cs.into_raw())
         .map_err(|e| Error::StringConversion(e.to_string()))
 }
@@ -89,10 +89,10 @@ pub fn free_boxed_client(client: *mut Client) {
 /// # Safety
 ///
 /// The caller must ensure the pointer was created by [`CString::into_raw`] and hasn't been freed.
-pub fn free_c_string(s: *mut c_char) {
-    if !s.is_null() {
+pub fn free_c_string(c_string_ptr: *mut c_char) {
+    if !c_string_ptr.is_null() {
         unsafe {
-            drop(CString::from_raw(s));
+            drop(CString::from_raw(c_string_ptr));
         }
     }
 }
@@ -160,12 +160,12 @@ mod tests {
 
     #[test]
     fn test_c_str_to_string_valid() {
-        let test_str = "Hello, World!";
-        let c_string = CString::new(test_str).unwrap();
-        let c_ptr = c_string.as_ptr();
+        let test_string = "Hello, World!";
+        let c_string = CString::new(test_string).unwrap();
+        let c_string_ptr = c_string.as_ptr();
 
-        let result = c_str_to_string(c_ptr);
-        assert_eq!(result.unwrap(), test_str);
+        let result = c_str_to_string(c_string_ptr);
+        assert_eq!(result.unwrap(), test_string);
     }
 
     #[test]
@@ -177,20 +177,20 @@ mod tests {
     #[test]
     fn test_c_str_to_string_invalid_utf8() {
         let invalid_bytes = [0xFF, 0xFE, 0x00]; // Invalid UTF-8 sequence + null terminator
-        let c_ptr = invalid_bytes.as_ptr() as *const c_char;
+        let c_string_ptr = invalid_bytes.as_ptr() as *const c_char;
 
-        let result = c_str_to_string(c_ptr);
+        let result = c_str_to_string(c_string_ptr);
         assert!(matches!(result, Err(Error::Utf8(_))));
     }
 
     #[test]
     fn test_optional_c_str_to_string_valid() {
-        let test_str = "Optional string";
-        let c_string = CString::new(test_str).unwrap();
-        let c_ptr = c_string.as_ptr();
+        let test_string = "Optional string";
+        let c_string = CString::new(test_string).unwrap();
+        let c_string_ptr = c_string.as_ptr();
 
-        let result = optional_c_str_to_string(c_ptr);
-        assert_eq!(result.unwrap(), Some(test_str.to_string()));
+        let result = optional_c_str_to_string(c_string_ptr);
+        assert_eq!(result.unwrap(), Some(test_string.to_string()));
     }
 
     #[test]
@@ -201,22 +201,22 @@ mod tests {
 
     #[test]
     fn test_string_to_c_str_valid() {
-        let test_str = "Test string".to_string();
-        let result = string_to_c_str(test_str.clone());
+        let test_string = "Test string".to_string();
+        let result = string_to_c_str(test_string.clone());
 
         assert!(result.is_ok());
-        let c_ptr = result.unwrap();
+        let c_string_ptr = result.unwrap();
 
-        let restored = unsafe { CStr::from_ptr(c_ptr) };
-        assert_eq!(restored.to_str().unwrap(), test_str);
+        let restored = unsafe { CStr::from_ptr(c_string_ptr) };
+        assert_eq!(restored.to_str().unwrap(), test_string);
 
-        free_c_string(c_ptr);
+        free_c_string(c_string_ptr);
     }
 
     #[test]
     fn test_string_to_c_str_with_null_byte() {
-        let test_str = "String\0with\0nulls".to_string();
-        let result = string_to_c_str(test_str);
+        let test_string = "String\0with\0nulls".to_string();
+        let result = string_to_c_str(test_string);
 
         assert!(matches!(result, Err(Error::StringConversion(_))));
     }
@@ -234,9 +234,9 @@ mod tests {
     #[test]
     fn test_free_c_string_valid() {
         let c_string = CString::new("test").unwrap();
-        let c_ptr = c_string.into_raw();
+        let c_string_ptr = c_string.into_raw();
 
-        free_c_string(c_ptr);
+        free_c_string(c_string_ptr);
     }
 
     #[test]
@@ -282,8 +282,8 @@ mod tests {
         let error_out = &mut error_ptr as *mut *mut c_char;
 
         let result: Result<String, Error> = Ok("success".to_string());
-        let output = handle_ffi_result!(result, error_out, |s| {
-            CString::new(s).unwrap().into_raw()
+        let output = handle_ffi_result!(result, error_out, |string| {
+            CString::new(string).unwrap().into_raw()
         });
 
         assert!(!output.is_null());
@@ -298,8 +298,8 @@ mod tests {
         let error_out = &mut error_ptr as *mut *mut c_char;
 
         let result: Result<String, Error> = Err(Error::NullPointer);
-        let output = handle_ffi_result!(result, error_out, |s| {
-            CString::new(s).unwrap().into_raw()
+        let output = handle_ffi_result!(result, error_out, |string| {
+            CString::new(string).unwrap().into_raw()
         });
 
         assert!(output.is_null());

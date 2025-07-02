@@ -260,31 +260,31 @@ pub extern "C" fn encrypt(
                 Vec::new()
             };
 
-            let ident = Identifier::new(table_str, column_str);
+            let identifier = Identifier::new(table, column);
             let (column_config, cast_as) = client
                 .encrypt_config
-                .get(&ident)
-                .ok_or_else(|| Error::UnknownColumn(ident.clone()))?;
+                .get(&identifier)
+                .ok_or_else(|| Error::UnknownColumn(identifier.clone()))?;
 
             let mut plaintext_target = plaintext_target::new(plaintext, column_config)?;
             plaintext_target.context = encryption_context;
 
             let encrypted =
-                encrypt_inner(client.clone(), plaintext_target, &ident, cast_as, None).await?;
+                encrypt_inner(client.clone(), plaintext_target, &identifier, cast_as, None).await?;
 
             serde_json::to_string(&encrypted).map_err(Error::from)
         })
     });
 
-    handle_ffi_result!(result, error_out, |json_str| {
-        safe_ffi::string_to_c_str(json_str).unwrap_or(ptr::null_mut())
+    handle_ffi_result!(result, error_out, |json_string| {
+        safe_ffi::string_to_c_str(json_string).unwrap_or(ptr::null_mut())
     })
 }
 
 async fn encrypt_inner(
     client: Client,
     plaintext_target: PlaintextTarget,
-    ident: &Identifier,
+    identifier: &Identifier,
     cast_as: &CastAs,
     service_token: Option<ServiceToken>,
 ) -> Result<Encrypted, Error> {
@@ -300,7 +300,7 @@ async fn encrypt_inner(
         )
     })?;
 
-    to_eql_encrypted(encrypted, ident, cast_as)
+    to_eql_encrypted(encrypted, identifier, cast_as)
 }
 
 /// Parses JSON encryption context into ZeroKMS context objects.
@@ -533,26 +533,26 @@ fn to_eql_encrypted(
 }
 
 /// Formats HMAC index bytes into hex-encoded string.
-fn format_index_term_binary(bytes: &Vec<u8>) -> String {
-    hex::encode(bytes)
+fn format_index_term_binary(index_bytes: &[u8]) -> String {
+    hex::encode(index_bytes)
 }
 
 /// Formats ORE index bytes into hex-encoded string.
-fn format_index_term_ore_bytea(bytes: &Vec<u8>) -> String {
-    hex::encode(bytes)
+fn format_index_term_ore_bytes(index_bytes: &[u8]) -> String {
+    hex::encode(index_bytes)
 }
 
 /// Formats ORE index array bytes into hex-encoded strings.
-fn format_index_term_ore_array(vec_of_bytes: &[Vec<u8>]) -> Vec<String> {
-    vec_of_bytes
+fn format_index_term_ore_array(ore_byte_arrays: &[Vec<u8>]) -> Vec<String> {
+    ore_byte_arrays
         .iter()
-        .map(format_index_term_ore_bytea)
+        .map(|index_bytes| format_index_term_ore_bytes(index_bytes))
         .collect()
 }
 
 /// Formats ORE index bytes into a single-element hex-encoded string array.
-fn format_index_term_ore(bytes: &Vec<u8>) -> Vec<String> {
-    vec![format_index_term_ore_bytea(bytes)]
+fn format_index_term_ore(index_bytes: &[u8]) -> Vec<String> {
+    vec![format_index_term_ore_bytes(index_bytes)]
 }
 
 /// Bulk encryption request item containing plaintext data and metadata.
@@ -613,29 +613,29 @@ pub extern "C" fn encrypt_bulk(
     let result: Result<String, Error> = runtime().and_then(|rt| {
         rt.block_on(async {
             let client = safe_ffi::client_ref(client)?;
-            let items_str = safe_ffi::c_str_to_string(items_json)?;
-            let items: Vec<BulkEncryptItem> = serde_json::from_str(&items_str)?;
+            let items_json_string = safe_ffi::c_str_to_string(items_json)?;
+            let items: Vec<BulkEncryptItem> = serde_json::from_str(&items_json_string)?;
 
             let mut plaintext_targets = Vec::new();
 
             for item in items {
-                let encryption_context = if let Some(context_val) = item.context {
-                    let context_str = serde_json::to_string(&context_val)?;
-                    parse_encryption_context(&context_str)?
+                let encryption_context = if let Some(context_value) = item.context {
+                    let context_json = serde_json::to_string(&context_value)?;
+                    parse_encryption_context(&context_json)?
                 } else {
                     Vec::new()
                 };
 
-                let ident = Identifier::new(item.table, item.column);
+                let identifier = Identifier::new(item.table, item.column);
                 let (column_config, cast_as) = client
                     .encrypt_config
-                    .get(&ident)
-                    .ok_or_else(|| Error::UnknownColumn(ident.clone()))?;
+                    .get(&identifier)
+                    .ok_or_else(|| Error::UnknownColumn(identifier.clone()))?;
 
                 let mut plaintext_target = plaintext_target::new(item.plaintext, column_config)?;
                 plaintext_target.context = encryption_context;
 
-                plaintext_targets.push((plaintext_target, ident, *cast_as));
+                plaintext_targets.push((plaintext_target, identifier, *cast_as));
             }
 
             let encrypted_results =
@@ -644,8 +644,8 @@ pub extern "C" fn encrypt_bulk(
         })
     });
 
-    handle_ffi_result!(result, error_out, |json_str| {
-        safe_ffi::string_to_c_str(json_str).unwrap_or(ptr::null_mut())
+    handle_ffi_result!(result, error_out, |json_string| {
+        safe_ffi::string_to_c_str(json_string).unwrap_or(ptr::null_mut())
     })
 }
 
@@ -717,15 +717,15 @@ pub extern "C" fn decrypt_bulk(
     let result: Result<String, Error> = runtime().and_then(|rt| {
         rt.block_on(async {
             let client = safe_ffi::client_ref(client)?;
-            let items_str = safe_ffi::c_str_to_string(items_json)?;
-            let items: Vec<BulkDecryptItem> = serde_json::from_str(&items_str)?;
+            let items_json_string = safe_ffi::c_str_to_string(items_json)?;
+            let items: Vec<BulkDecryptItem> = serde_json::from_str(&items_json_string)?;
 
             let mut ciphertexts = Vec::new();
 
             for item in items {
-                let encryption_context = if let Some(context_val) = item.context {
-                    let context_str = serde_json::to_string(&context_val)?;
-                    parse_encryption_context(&context_str)?
+                let encryption_context = if let Some(context_value) = item.context {
+                    let context_json = serde_json::to_string(&context_value)?;
+                    parse_encryption_context(&context_json)?
                 } else {
                     Vec::new()
                 };
@@ -738,8 +738,8 @@ pub extern "C" fn decrypt_bulk(
         })
     });
 
-    handle_ffi_result!(result, error_out, |json_str| {
-        safe_ffi::string_to_c_str(json_str).unwrap_or(ptr::null_mut())
+    handle_ffi_result!(result, error_out, |json_string| {
+        safe_ffi::string_to_c_str(json_string).unwrap_or(ptr::null_mut())
     })
 }
 
@@ -794,30 +794,31 @@ pub extern "C" fn create_search_terms(
     let result: Result<String, Error> = runtime().and_then(|rt| {
         rt.block_on(async {
             let client = safe_ffi::client_ref(client)?;
-            let terms_str = safe_ffi::c_str_to_string(terms_json)?;
-            let terms: Vec<SearchTermItem> = serde_json::from_str(&terms_str)?;
+            let terms_json = safe_ffi::c_str_to_string(terms_json)?;
+            let terms: Vec<SearchTermItem> = serde_json::from_str(&terms_json)?;
 
             let mut search_terms_json = Vec::new();
 
             for term in terms {
-                let encryption_context = if let Some(context_val) = term.context {
-                    let context_str = serde_json::to_string(&context_val)?;
-                    parse_encryption_context(&context_str)?
+                let encryption_context = if let Some(context_value) = term.context {
+                    let context_json = serde_json::to_string(&context_value)?;
+                    parse_encryption_context(&context_json)?
                 } else {
                     Vec::new()
                 };
 
-                let ident = Identifier::new(term.table, term.column);
+                let identifier = Identifier::new(term.table, term.column);
                 let (column_config, cast_as) = client
                     .encrypt_config
-                    .get(&ident)
-                    .ok_or_else(|| Error::UnknownColumn(ident.clone()))?;
+                    .get(&identifier)
+                    .ok_or_else(|| Error::UnknownColumn(identifier.clone()))?;
 
                 let mut plaintext_target = plaintext_target::new(term.plaintext, column_config)?;
                 plaintext_target.context = encryption_context;
 
                 let encrypted =
-                    encrypt_inner(client.clone(), plaintext_target, &ident, cast_as, None).await?;
+                    encrypt_inner(client.clone(), plaintext_target, &identifier, cast_as, None)
+                        .await?;
 
                 let search_term_json = match encrypted {
                     Encrypted::Ciphertext {
@@ -863,8 +864,8 @@ pub extern "C" fn create_search_terms(
         })
     });
 
-    handle_ffi_result!(result, error_out, |json_str| {
-        safe_ffi::string_to_c_str(json_str).unwrap_or(ptr::null_mut())
+    handle_ffi_result!(result, error_out, |json_string| {
+        safe_ffi::string_to_c_str(json_string).unwrap_or(ptr::null_mut())
     })
 }
 
@@ -882,10 +883,10 @@ pub extern "C" fn free_client(client: *mut Client) {
 ///
 /// # Safety
 ///
-/// The `s` pointer must have been returned by this library and not previously freed.
+/// The `string` pointer must have been returned by this library and not previously freed.
 #[no_mangle]
-pub extern "C" fn free_string(s: *mut c_char) {
-    safe_ffi::free_c_string(s);
+pub extern "C" fn free_string(string: *mut c_char) {
+    safe_ffi::free_c_string(string);
 }
 
 #[cfg(test)]
@@ -907,19 +908,19 @@ mod lib {
             ];
 
             for error in errors {
-                let display_str = format!("{}", error);
-                assert!(!display_str.is_empty());
+                let display_string = format!("{}", error);
+                assert!(!display_string.is_empty());
 
                 match error {
-                    Error::NullPointer => assert!(display_str.contains("null pointer")),
-                    Error::StringConversion(msg) => assert!(display_str.contains(&msg)),
-                    Error::Runtime(msg) => assert!(display_str.contains(&msg)),
-                    Error::Unimplemented(msg) => assert!(display_str.contains(&msg)),
+                    Error::NullPointer => assert!(display_string.contains("null pointer")),
+                    Error::StringConversion(msg) => assert!(display_string.contains(&msg)),
+                    Error::Runtime(msg) => assert!(display_string.contains(&msg)),
+                    Error::Unimplemented(msg) => assert!(display_string.contains(&msg)),
                     Error::InvariantViolation(msg) => {
-                        assert!(display_str.contains(&msg));
-                        assert!(display_str.contains("bug in protect-ffi"));
+                        assert!(display_string.contains(&msg));
+                        assert!(display_string.contains("bug in protect-ffi"));
                     }
-                    Error::Base85(msg) => assert!(display_str.contains(&msg)),
+                    Error::Base85(msg) => assert!(display_string.contains(&msg)),
                     _ => {}
                 }
             }
@@ -1054,10 +1055,7 @@ mod lib {
             let mut error_ptr: *mut c_char = ptr::null_mut();
             let error_out = &mut error_ptr as *mut *mut c_char;
 
-            let ciphertext = CString::new(
-                r#"{"k":"ct","c":"test","i":{"table":"users","column":"name"},"v":2}"#,
-            )
-            .unwrap();
+            let ciphertext = CString::new("test-ciphertext").unwrap();
 
             let result = decrypt(ptr::null(), ciphertext.as_ptr(), ptr::null(), error_out);
 
