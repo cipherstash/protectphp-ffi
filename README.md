@@ -181,7 +181,7 @@ WHERE eql_v2.hmac_256(email) = eql_v2.hmac_256(
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
 SELECT * FROM patient_records 
 WHERE eql_v2.hmac_256(email) = eql_v2.hmac_256(
-  '{"hm":"0f4f3b99671e74c0f8b5a1d2e3f4...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"}}'
+  '{"hm":"0f4f3b99671e74c0f8b5a1d2e3f4a5b6c7d8...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"}}'
 );
 ```
 
@@ -225,7 +225,7 @@ WHERE eql_v2.ore_block_u64_8_256(systolic_bp) = eql_v2.ore_block_u64_8_256(
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
 SELECT * FROM patient_records 
 WHERE eql_v2.ore_block_u64_8_256(systolic_bp) = eql_v2.ore_block_u64_8_256(
-  '{"hm":null,"ob":["0x1a2b3c..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'
+  '{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'
 );
 
 -- Find patients with blood pressure above specified threshold
@@ -238,7 +238,7 @@ WHERE eql_v2.ore_block_u64_8_256(systolic_bp) >= eql_v2.ore_block_u64_8_256(
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
 SELECT * FROM patient_records 
 WHERE eql_v2.ore_block_u64_8_256(systolic_bp) >= eql_v2.ore_block_u64_8_256(
-  '{"hm":null,"ob":["0x1a2b3c..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'
+  '{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'
 );
 
 -- Find patients with blood pressure in specified range
@@ -251,8 +251,8 @@ WHERE eql_v2.ore_block_u64_8_256(systolic_bp) BETWEEN
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
 SELECT * FROM patient_records 
 WHERE eql_v2.ore_block_u64_8_256(systolic_bp) BETWEEN 
-      eql_v2.ore_block_u64_8_256('{"hm":null,"ob":["0x1f5e2d..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}') 
-  AND eql_v2.ore_block_u64_8_256('{"hm":null,"ob":["0x9c8b7a..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}');
+      eql_v2.ore_block_u64_8_256('{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}') 
+  AND eql_v2.ore_block_u64_8_256('{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}');
 
 -- Order patients by blood pressure from lowest to highest
 SELECT * FROM patient_records 
@@ -330,7 +330,7 @@ WHERE eql_v2.bloom_filter(medical_notes) @> eql_v2.bloom_filter(
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
 SELECT * FROM patient_records 
 WHERE eql_v2.bloom_filter(medical_notes) @> eql_v2.bloom_filter(
-  '{"hm":null,"ob":null,"bf":[142,891,1337,1847,2001],"i":{"t":"patient_records","c":"medical_notes"}}'
+  '{"hm":null,"ob":null,"bf":[1397,378,1463,1673,1474,1226],"i":{"t":"patient_records","c":"medical_notes"}}'
 );
 ```
 
@@ -472,7 +472,7 @@ try {
     $ciphertext = $result['c'];
 
     echo $ciphertext;
-    // mBbM8rvts7^sycKCI!-Y9x2kL8vN...
+    // mBbKlk}G7QdaGiNj$dL7#+AOrA^}*VJx...
 } finally {
     $client->freeClient($clientPtr);
 }
@@ -492,9 +492,9 @@ For columns configured with the `unique`, `ore`, and/or `match` indexes:
 ```json
 {
     "k": "ct",
-    "c": "mBbM8rvts7^sycKCI!-Y9x2kL8vN...",
+    "c": "mBbKlk}G7QdaGiNj$dL7#+AOrA^}*VJx...",
     "dt": "text",
-    "hm": "0f4f3b99671e74c0f8b5a1d2e3f4...",
+    "hm": "f3ca71fd39ae9d3d1d1fc25141bcb6da...",
     "ob": null,
     "bf": null,
     "i": {
@@ -792,7 +792,7 @@ try {
         $ciphertext = $encryptedData['c'];
 
         echo $ciphertext;
-        // mBbM8rvts7^sycKCI!-Y9x2kL8vN...
+        // mBbKuXT|+vBh~K2WV-!n5_W3DBFd4`Mp...
     }
 } finally {
     $client->freeClient($clientPtr);
@@ -859,7 +859,7 @@ try {
     $ciphertextItemsJson = json_encode($ciphertextItems, JSON_THROW_ON_ERROR);
 
     echo $ciphertextItemsJson;
-    // [{"ciphertext":"mBbM8rvts7^sycKCI!-Y9x2kL8vN..."},{"ciphertext":"nCcN9swus8^tzdLDJ!-Z0y3lM9wO..."}]
+    // [{"ciphertext":"mBbK>BcAYctW$Gy)vK2)Y$&nBBKz{oL1..."},{"ciphertext":"mBbJ<8tOEI+Z`KFUV`q&kmdWtO#DKxW|..."}]
 
     $decryptedResultJson = $client->decryptBulk($clientPtr, $ciphertextItemsJson);
 
@@ -926,7 +926,7 @@ try {
 
     foreach ($result as $searchTerms) {
         echo json_encode($searchTerms);
-        // {"hm":"0f4f3b99671e74c0f8b5a1d2e3f4...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"}}
+        // {"hm":"f3ca71fd39ae9d3d1d1fc25141bcb6da...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"}}
     }
 } finally {
     $client->freeClient($clientPtr);
@@ -945,7 +945,7 @@ For columns configured with `unique`, `ore`, and/or `match` indexes:
 
 ```json
 {
-    "hm": "0f4f3b99671e74c0f8b5a1d2e3f4...",
+    "hm": "f3ca71fd39ae9d3d1d1fc25141bcb6da...",
     "ob": null,
     "bf": null,
     "i": {
@@ -1045,7 +1045,7 @@ try {
     $ciphertext = $result['c'];
 
     echo $ciphertext;
-    // mBbM8rvts7^sycKCI!-Y9x2kL8vN...
+    // mBbKlk}G7QdaGiNj$dL7#+AOrA^}*VJx...
 } catch (FFIException $e) {
     error_log($e->getMessage());
 
