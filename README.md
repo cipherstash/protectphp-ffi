@@ -369,12 +369,12 @@ WHERE cs_ste_vec_v2(health_assessment, '{"conditions":["diabetes","hypertension"
 
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
 SELECT * FROM patient_records 
-WHERE health_assessment @> '{"sv":[{"tokenized_selector":"dd4659b9c279af040dd05ce21b2a22f7","term":"00a6343301fae638379a8b1f9147eda082","record":"mBbLOIqSF%n4>5ajY+w?-+!*eKqJt(|G8c0rEaxnXm!MLTLGT0tuse(H;lHjz!hWQpW&^_vF3;xdm^M%l{vX7mB05%=#-7DSapsQ$y(uxxWphCxN}>hI__Q00^;tc;bvpcK_`<{cx)595mX{~O#Z^4zy","parent_is_array":false}],"i":{"t":"patient_records","c":"health_assessment"}}';
+WHERE health_assessment @> '{"sv":[{"s":"dd4659b9c279af040dd05ce21b2a22f7...","t":"22303061363334333330316661653633...","r":"mBbL}QHJ&a(@rwS5n)u^G+Fb+t}Soo-h...","pa":false}],"i":{"t":"patient_records","c":"health_assessment"}}';
 
 -- Find records where encrypted data is contained by specified values
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
 SELECT * FROM patient_records 
-WHERE health_assessment <@ '{"sv":[{"tokenized_selector":"cff40d3394bcb913237661f679280999","term":"022d3a7feb298b2d93b9f3a2cd0c0bebf8c524b8a991f9eedfbfe52477fe7b3817de6ae2fec499e5b3e7b0a5daefc88ea45923e2cc5c6658c18f477f7eb6542106","record":"mBbLOIqSF%n4>5ajY+w?-+!*e9B5XGJ%B#Hphr%zC1ge&;+sJ+zW5p~UC^A%;KU#qxN}>hI__Q00^;tc;bvpcK_`<{cx)595mX{~O#Z^4zy","parent_is_array":false}],"i":{"t":"patient_records","c":"health_assessment"}}';
+WHERE health_assessment <@ '{"sv":[{"s":"df08a4c4157bdb5bf6fa9be89cf18d10...","t":"22303063343133306135646334356130...","r":"mBbL}QHJ&a(@rwS5n)u^G+Fb+Ex8ofB!...","pa":false}],"i":{"t":"patient_records","c":"health_assessment"}}';
 ```
 
 This index differs from other indexes in its query patterns. Plaintext queries use `cs_ste_vec_v2()` with JSON data and only support the PostgreSQL `@>` operator, while search term queries can use both PostgreSQL `@>` and `<@` operators with pre-computed vectors from the `sv` response field in the search terms response.
@@ -525,14 +525,14 @@ For columns configured with the `ste_vec` index:
 ```json
 {
     "k": "sv",
-    "c": "mBbKND$(wyS}0*#KjqS!Is$dX...",
+    "c": "mBbLQ2^Io|1eh_K2*n^LSCVVQuGhkL>w...",
     "dt": "jsonb",
     "sv": [
         {
-            "tokenized_selector": "dd4659b9c279af040dd05ce21b2a22f7",
-            "term": "00a6343301fae638379a8b1f9147eda082",
-            "record": "mBbKND$(wyS}0*#KjqS!Is$dX...",
-            "parent_is_array": false
+            "s": "dd4659b9c279af040dd05ce21b2a22f7...",
+            "t": "22303061363334333330316661653633...",
+            "r": "mBbLQ2^Io|1eh_K2*n^LSCVVQuGhkL>w...",
+            "pa": false
         }
     ],
     "i": {
@@ -551,10 +551,10 @@ Response parameters:
 | `c` | `string` | Always | Base85-encoded ciphertext containing the encrypted data |
 | `dt` | `string` | Always | Data type for casting (from `cast_as` configuration parameter) |
 | `sv` | `array` | `ste_vec` | Structured text encryption vector for JSONB containment queries |
-| `sv[].tokenized_selector` | `string` | `ste_vec` | Encrypted selector for the JSON path |
-| `sv[].term` | `string` | `ste_vec` | Encrypted term value |
-| `sv[].record` | `string` | `ste_vec` | Base85-encoded encrypted record data |
-| `sv[].parent_is_array` | `boolean` | `ste_vec` | Whether the parent JSON element is an array |
+| `sv[].s` | `string` | `ste_vec` | Tokenized selector representing the encrypted JSON path to the value |
+| `sv[].t` | `string` | `ste_vec` | Encrypted term value for equality and order-preserving queries |
+| `sv[].r` | `string` | `ste_vec` | Base85-encoded ciphertext containing the encrypted record data |
+| `sv[].pa` | `boolean` | `ste_vec` | Whether the parent JSON element is an array |
 | `i` | `object` | Always | Table and column identifier for this encrypted value: `{"t":"table_name","c":"column_name"}` |
 | `v` | `int` | Always | Schema version for backward compatibility |
 
@@ -972,16 +972,16 @@ For columns configured with `ste_vec` indexes:
 {
     "sv": [
         {
-            "tokenized_selector": "dd4659b9c279af040dd05ce21b2a22f7",
-            "term": "00a6343301fae638379a8b1f9147eda082",
-            "record": "mBbM0GYe4Wa7OJ<2HG_ZQ42Z5KmmLn7{+K)z~e9h*+$l...",
-            "parent_is_array": false
+            "s": "dd4659b9c279af040dd05ce21b2a22f7...",
+            "t": "22303061363334333330316661653633...",
+            "r": "mBbLkCZcaJ2U|G333rRC>f;r}uFEp7Tg...",
+            "pa": false
         },
         {
-            "tokenized_selector": "cff40d3394bcb913237661f679280999",
-            "term": "022d3a7feb298b2d93b9f3a2cd0c0bebf8c524b8a991...",
-            "record": "mBbM0GYe4Wa7OJ<2HG_ZQ42Z59Mj-WD;uRkcn7ZHj&a4...",
-            "parent_is_array": false
+            "s": "df08a4c4157bdb5bf6fa9be89cf18d10...",
+            "t": "22303063343133306135646334356130...",
+            "r": "mBbLkCZcaJ2U|G333rRC>f;r}E&d@?`;...",
+            "pa": false
         }
     ],
     "i": {
@@ -996,10 +996,10 @@ Response parameters:
 | Parameter | Type | Source | Description |
 |-----------|------|--------|-------------|
 | `sv` | `array` | `ste_vec` | Structured text encryption vector for JSONB containment queries |
-| `sv[].tokenized_selector` | `string` | `ste_vec` | Encrypted selector for the JSON path |
-| `sv[].term` | `string` | `ste_vec` | Encrypted term value |
-| `sv[].record` | `string` | `ste_vec` | Base85-encoded encrypted record data |
-| `sv[].parent_is_array` | `boolean` | `ste_vec` | Whether the parent JSON element is an array |
+| `sv[].s` | `string` | `ste_vec` | Tokenized selector representing the encrypted JSON path to the value |
+| `sv[].t` | `string` | `ste_vec` | Encrypted term value for equality and order-preserving queries |
+| `sv[].r` | `string` | `ste_vec` | Base85-encoded ciphertext containing the encrypted record data |
+| `sv[].pa` | `boolean` | `ste_vec` | Whether the parent JSON element is an array |
 | `i` | `object` | Always | Table and column identifier for this encrypted value: `{"t":"table_name","c":"column_name"}` |
 
 ### Error Handling

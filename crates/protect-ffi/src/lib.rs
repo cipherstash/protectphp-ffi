@@ -14,7 +14,7 @@ use cipherstash_client::{
     credentials::{ServiceCredentials, ServiceToken},
     encryption::{
         self, EncryptionError, IndexTerm, Plaintext, PlaintextTarget, ReferencedPendingPipeline,
-        ScopedCipher, SteVec, TypeParseError,
+        ScopedCipher, TypeParseError,
     },
     schema::ColumnConfig,
     zerokms::{self, EncryptedRecord, WithContext, ZeroKMSWithClientKey},
@@ -48,6 +48,23 @@ pub struct Client {
     cipher: Arc<ScopedZeroKMSNoRefresh>,
     zerokms: Arc<ZeroKMSWithClientKey<ServiceCredentials>>,
     encrypt_config: Arc<HashMap<Identifier, (ColumnConfig, CastAs)>>,
+}
+
+/// A structured text encryption vector entry.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SteVecEntry {
+    /// Tokenized selector representing the encrypted JSON path to the value.
+    #[serde(rename = "s")]
+    tokenized_selector: String,
+    /// Encrypted term value for equality and order-preserving queries.
+    #[serde(rename = "t")]
+    term: String,
+    /// Base85-encoded ciphertext containing the encrypted record data.
+    #[serde(rename = "r")]
+    record: String,
+    /// Whether the parent JSON element is an array.
+    #[serde(rename = "pa")]
+    parent_is_array: bool,
 }
 
 /// An encrypted value with associated encryption indexes or structured text encryption vectors.
@@ -91,7 +108,7 @@ pub enum Encrypted {
         data_type: String,
         /// Structured text encryption vector for JSONB containment queries.
         #[serde(rename = "sv")]
-        ste_vec_index: SteVec<16>,
+        ste_vec_index: Vec<SteVecEntry>,
         /// Table and column identifier for this encrypted value.
         #[serde(rename = "i")]
         identifier: Identifier,
@@ -483,10 +500,31 @@ fn to_eql_encrypted(
                 // Instead, we use `map_err`.
                 .map_err(|err| Error::Base85(err.to_string()))?;
 
+            let ste_vec_entries: Result<Vec<SteVecEntry>, Error> = ste_vec_index
+                .into_iter()
+                .map(|entry| {
+                    let record = entry
+                        .record
+                        .to_mp_base85()
+                        // The error type from `to_mp_base85` isn't public, so we don't derive an error for this one.
+                        // Instead, we use `map_err`.
+                        .map_err(|err| Error::Base85(err.to_string()))?;
+
+                    Ok(SteVecEntry {
+                        tokenized_selector: hex::encode(entry.tokenized_selector.as_bytes()),
+                        term: hex::encode(&serde_json::to_vec(&entry.term).map_err(Error::Parse)?),
+                        record,
+                        parent_is_array: entry.parent_is_array,
+                    })
+                })
+                .collect();
+
+            let ste_vec_entries = ste_vec_entries?;
+
             Ok(Encrypted::SteVec {
                 ciphertext,
                 data_type: cast_as.to_string(),
-                ste_vec_index,
+                ste_vec_index: ste_vec_entries,
                 identifier: identifier.to_owned(),
                 version: 2,
             })
@@ -934,18 +972,27 @@ mod lib {
 
         #[test]
         fn test_encrypted_stevec_json_format() {
-            let json = r#"{"k":"sv","c":"test-ciphertext","dt":"jsonb","sv":[],"i":{"t":"docs","c":"content"},"v":2}"#;
+            let json = r#"{"k":"sv","c":"test-ciphertext","dt":"jsonb","sv":[{"s":"test-selector","t":"test-term","r":"test-record","pa":false}],"i":{"t":"test_table","c":"test_column"},"v":2}"#;
 
             let parsed: serde_json::Value = serde_json::from_str(json).unwrap();
             assert_eq!(parsed["k"], "sv");
             assert_eq!(parsed["c"], "test-ciphertext");
             assert_eq!(parsed["dt"], "jsonb");
-            assert_eq!(parsed["sv"], serde_json::Value::Array(vec![]));
-            assert_eq!(parsed["v"], 2);
+
+            let sv_array = parsed["sv"].as_array().unwrap();
+            assert_eq!(sv_array.len(), 1);
+
+            let sv_entry = &sv_array[0];
+            assert_eq!(sv_entry["s"], "test-selector");
+            assert_eq!(sv_entry["t"], "test-term");
+            assert_eq!(sv_entry["r"], "test-record");
+            assert_eq!(sv_entry["pa"], false);
 
             let identifier = &parsed["i"];
-            assert_eq!(identifier["t"], "docs");
-            assert_eq!(identifier["c"], "content");
+            assert_eq!(identifier["t"], "test_table");
+            assert_eq!(identifier["c"], "test_column");
+
+            assert_eq!(parsed["v"], 2);
         }
 
         #[test]
