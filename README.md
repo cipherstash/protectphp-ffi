@@ -102,7 +102,7 @@ Configuration parameters:
 
 **Data Types**
 
-The `cast_as` field determines how plaintext data is processed before encryption:
+The `cast_as` parameter determines how plaintext data is processed before encryption:
 
 | Type | Description | Example Input |
 |------|-------------|---------------|
@@ -118,9 +118,9 @@ The `cast_as` field determines how plaintext data is processed before encryption
 
 **Index Types**
 
-The `indexes` field determines what operations are supported on encrypted data:
+The `indexes` parameter determines what operations are supported on encrypted data:
 
-| Index Type | Use Case | Response Field | Plaintext Queries | Search Terms Queries |
+| Index Type | Use Case | Response Parameter | Plaintext Queries | Search Terms Queries |
 |------------|----------|----------------|-------------------|---------------------|
 | `unique` | Exact equality queries and uniqueness constraints | `hm` | `eql_v2.hmac_256()` | `eql_v2.hmac_256()` |
 | `ore` | Equality, range comparisons, range queries, and ordering | `ob` | `eql_v2.ore_block_u64_8_256()` | `eql_v2.ore_block_u64_8_256()` |
@@ -129,7 +129,7 @@ The `indexes` field determines what operations are supported on encrypted data:
 
 **Unique Index (`unique`)**
 
-Enables exact equality queries and database uniqueness constraints. Uses the `hm` response field and works with the `eql_v2.hmac_256()` EQL function. This index generates HMAC-based hashes for exact equality matching.
+Enables exact equality queries and database uniqueness constraints. Uses the `hm` response parameter and works with the `eql_v2.hmac_256()` EQL function. This index generates HMAC-based hashes for exact equality matching.
 
 Basic usage:
 
@@ -185,7 +185,7 @@ WHERE eql_v2.hmac_256(email) = eql_v2.hmac_256(
 );
 ```
 
-For database-level uniqueness constraints, add a unique constraint on the `hm` response field:
+For database-level uniqueness constraints, add a unique constraint on the `hm` response parameter:
 
 ```sql
 CONSTRAINT unique_email UNIQUE ((email->>'hm'))
@@ -193,7 +193,7 @@ CONSTRAINT unique_email UNIQUE ((email->>'hm'))
 
 **Order Revealing Encryption Index (`ore`)**
 
-Enables equality, range operations, and ordering on encrypted data. Uses the `ob` response field and works with the `eql_v2.ore_block_u64_8_256()` EQL function. This index creates order-preserving encrypted values for equality checks, range comparisons, range queries, and sorting operations.
+Enables equality, range operations, and ordering on encrypted data. Uses the `ob` response parameter and works with the `eql_v2.ore_block_u64_8_256()` EQL function. This index creates order-preserving encrypted values for equality checks, range comparisons, range queries, and sorting operations.
 
 Basic usage:
 
@@ -265,7 +265,7 @@ ORDER BY eql_v2.ore_block_u64_8_256(systolic_bp) DESC;
 
 **Match Index (`match`)**
 
-Enables full-text search on encrypted text data using bloom filters. Uses the `bf` response field and works with the `eql_v2.bloom_filter()` EQL function. This index creates bloom filter representations of tokenized text for probabilistic matching.
+Enables full-text search on encrypted text data using bloom filters. Uses the `bf` response parameter and works with the `eql_v2.bloom_filter()` EQL function. This index creates bloom filter representations of tokenized text for probabilistic matching.
 
 Basic usage:
 
@@ -336,7 +336,7 @@ WHERE eql_v2.bloom_filter(medical_notes) @> eql_v2.bloom_filter(
 
 **Structured Text Encryption Vector Index (`ste_vec`)**
 
-Enables containment queries on encrypted JSONB data. Uses the `sv` response field and works with the `cs_ste_vec_v2()` EQL function for plaintext queries and PostgreSQL containment operators (`@>`, `<@`) for search terms queries. This index creates structured text encryption vectors that preserve JSON path relationships for encrypted JSONB containment matching.
+Enables containment queries on encrypted JSONB data. Uses the `sv` response parameter and works with the `cs_ste_vec_v2()` EQL function for plaintext queries and PostgreSQL containment operators (`@>`, `<@`) for search terms queries. This index creates structured text encryption vectors that preserve JSON path relationships for encrypted JSONB containment matching.
 
 Basic usage:
 
@@ -377,7 +377,7 @@ SELECT * FROM patient_records
 WHERE health_assessment <@ '{"sv":[{"s":"df08a4c4157bdb5bf6fa9be89cf18d10...","t":"22303063343133306135646334356130...","r":"mBbL}QHJ&a(@rwS5n)u^G+Fb+Ex8ofB!...","pa":false}],"i":{"t":"patient_records","c":"health_assessment"}}';
 ```
 
-This index differs from other indexes in its query patterns. Plaintext queries use `cs_ste_vec_v2()` with JSON data and only support the PostgreSQL `@>` operator, while search term queries can use both PostgreSQL `@>` and `<@` operators with pre-computed vectors from the `sv` response field in the search terms response.
+This index differs from other indexes in its query patterns. Plaintext queries use `cs_ste_vec_v2()` with JSON data and only support the PostgreSQL `@>` operator, while search term queries can use both PostgreSQL `@>` and `<@` operators with pre-computed vectors from the `sv` response parameter in the search terms response.
 
 ### Creating a Client
 
