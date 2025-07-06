@@ -32,13 +32,13 @@ pub fn client_ref<'a>(client: *const Client) -> Result<&'a Client, Error> {
 /// # Safety
 ///
 /// The caller must ensure the pointer points to a valid null-terminated C string.
-pub fn c_str_to_string(c_string_ptr: *const c_char) -> Result<String, Error> {
-    if c_string_ptr.is_null() {
+pub fn c_str_to_string(c_str_ptr: *const c_char) -> Result<String, Error> {
+    if c_str_ptr.is_null() {
         Err(Error::NullPointer)
     } else {
         unsafe {
-            let c_string = CStr::from_ptr(c_string_ptr);
-            Ok(c_string.to_str()?.to_owned())
+            let c_str = CStr::from_ptr(c_str_ptr);
+            Ok(c_str.to_str()?.to_owned())
         }
     }
 }
@@ -52,20 +52,23 @@ pub fn c_str_to_string(c_string_ptr: *const c_char) -> Result<String, Error> {
 /// # Safety
 ///
 /// If not null, the caller must ensure the pointer points to a valid null-terminated C string.
-pub fn optional_c_str_to_string(c_string_ptr: *const c_char) -> Result<Option<String>, Error> {
-    if c_string_ptr.is_null() {
+pub fn optional_c_str_to_string(c_str_ptr: *const c_char) -> Result<Option<String>, Error> {
+    if c_str_ptr.is_null() {
         Ok(None)
     } else {
-        Ok(Some(c_str_to_string(c_string_ptr)?))
+        Ok(Some(c_str_to_string(c_str_ptr)?))
     }
 }
 
 /// Convert a Rust [`String`] to a C string pointer.
 ///
+/// Returns a raw pointer to a null-terminated C string that must be freed
+/// with [`free_c_string`] to avoid memory leaks.
+///
 /// # Errors
 ///
 /// Returns [`Error::StringConversion`] if the string contains null bytes.
-pub fn string_to_c_str(string: String) -> Result<*mut c_char, Error> {
+pub fn string_to_c_string(string: String) -> Result<*mut c_char, Error> {
     CString::new(string)
         .map(|cs| cs.into_raw())
         .map_err(|e| Error::StringConversion(e.to_string()))
@@ -202,7 +205,7 @@ mod tests {
     #[test]
     fn test_string_to_c_string_valid() {
         let table = "users".to_string();
-        let result = string_to_c_str(table.clone());
+        let result = string_to_c_string(table.clone());
 
         assert!(result.is_ok());
         let table_ptr = result.unwrap();
@@ -216,7 +219,7 @@ mod tests {
     #[test]
     fn test_string_to_c_string_with_null_byte() {
         let invalid_config = "table\0column\0data".to_string();
-        let result = string_to_c_str(invalid_config);
+        let result = string_to_c_string(invalid_config);
 
         assert!(matches!(result, Err(Error::StringConversion(_))));
     }

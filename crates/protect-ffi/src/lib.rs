@@ -277,7 +277,7 @@ pub extern "C" fn encrypt(
     });
 
     handle_ffi_result!(result, error_out, |json_string| {
-        safe_ffi::string_to_c_str(json_string).unwrap_or(ptr::null_mut())
+        safe_ffi::string_to_c_string(json_string).unwrap_or(ptr::null_mut())
     })
 }
 
@@ -383,7 +383,7 @@ pub extern "C" fn decrypt(
     });
 
     handle_ffi_result!(result, error_out, |plaintext| {
-        safe_ffi::string_to_c_str(plaintext).unwrap_or(ptr::null_mut())
+        safe_ffi::string_to_c_string(plaintext).unwrap_or(ptr::null_mut())
     })
 }
 
@@ -645,7 +645,7 @@ pub extern "C" fn encrypt_bulk(
     });
 
     handle_ffi_result!(result, error_out, |json_string| {
-        safe_ffi::string_to_c_str(json_string).unwrap_or(ptr::null_mut())
+        safe_ffi::string_to_c_string(json_string).unwrap_or(ptr::null_mut())
     })
 }
 
@@ -739,7 +739,7 @@ pub extern "C" fn decrypt_bulk(
     });
 
     handle_ffi_result!(result, error_out, |json_string| {
-        safe_ffi::string_to_c_str(json_string).unwrap_or(ptr::null_mut())
+        safe_ffi::string_to_c_string(json_string).unwrap_or(ptr::null_mut())
     })
 }
 
@@ -865,7 +865,7 @@ pub extern "C" fn create_search_terms(
     });
 
     handle_ffi_result!(result, error_out, |json_string| {
-        safe_ffi::string_to_c_str(json_string).unwrap_or(ptr::null_mut())
+        safe_ffi::string_to_c_string(json_string).unwrap_or(ptr::null_mut())
     })
 }
 
