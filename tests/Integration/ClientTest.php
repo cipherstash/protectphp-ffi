@@ -551,6 +551,35 @@ class ClientTest extends TestCase
         }
     }
 
+    public function test_decrypt_throws_exception_with_context_on_ste_vec_column(): void
+    {
+        $client = new Client;
+        $clientPtr = $client->newClient(self::$config);
+
+        try {
+            $plaintext = '{"city":"Boston","state":"MA"}';
+
+            $contextJson = json_encode([
+                'tag' => ['test-context'],
+            ], JSON_THROW_ON_ERROR);
+
+            // Context is ignored during encryption
+            $encryptResultJson = $client->encrypt($clientPtr, $plaintext, 'metadata', 'users', $contextJson);
+            $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+            $this->assertIsArray($encryptResult);
+            $this->assertArrayHasKey('c', $encryptResult);
+            $ciphertext = $encryptResult['c'];
+            $this->assertIsString($ciphertext);
+            $this->assertNotEmpty($ciphertext);
+
+            // Context causes decryption to fail
+            $this->expectException(FFIException::class);
+            $client->decrypt($clientPtr, $ciphertext, $contextJson);
+        } finally {
+            $client->freeClient($clientPtr);
+        }
+    }
+
     public function test_encrypt_decrypt_bulk_roundtrip(): void
     {
         $client = new Client;
@@ -689,6 +718,78 @@ class ClientTest extends TestCase
                 '{"city":"Boston","state":"MA"}',
             ];
             $this->assertEquals($expectedPlaintexts, $decryptedPlaintexts);
+        } finally {
+            $client->freeClient($clientPtr);
+        }
+    }
+
+    public function test_encrypt_decrypt_bulk_roundtrip_with_context(): void
+    {
+        $client = new Client;
+        $clientPtr = $client->newClient(self::$config);
+
+        try {
+            $items = [
+                [
+                    'plaintext' => 'john@example.com',
+                    'column' => 'email',
+                    'table' => 'users',
+                    'context' => ['tag' => ['test-context']],
+                ],
+                [
+                    'plaintext' => '29',
+                    'column' => 'age',
+                    'table' => 'users',
+                    'context' => ['tag' => ['test-context']],
+                ],
+                [
+                    'plaintext' => 'Software Engineer',
+                    'column' => 'job_title',
+                    'table' => 'users',
+                    'context' => ['tag' => ['test-context']],
+                ],
+                [
+                    'plaintext' => '{"city":"Boston","state":"MA"}',
+                    'column' => 'metadata',
+                    'table' => 'users',
+                ],
+            ];
+
+            $itemsJson = json_encode($items, JSON_THROW_ON_ERROR);
+            $encryptResultJson = $client->encryptBulk($clientPtr, $itemsJson);
+            $encryptResults = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+
+            $this->assertIsArray($encryptResults);
+            $this->assertCount(4, $encryptResults);
+
+            $decryptItems = array_map(function ($item, $encryptResult) {
+                assert(is_array($encryptResult));
+
+                $ciphertext = $encryptResult['c'];
+                $this->assertIsString($ciphertext);
+                $this->assertNotEmpty($ciphertext);
+
+                $decryptItem = ['ciphertext' => $ciphertext];
+
+                if (isset($item['context'])) {
+                    $decryptItem['context'] = $item['context'];
+                }
+
+                return $decryptItem;
+            }, $items, $encryptResults);
+
+            $decryptItemsJson = json_encode($decryptItems, JSON_THROW_ON_ERROR);
+            $decryptResultJson = $client->decryptBulk($clientPtr, $decryptItemsJson);
+            $decryptResults = json_decode(json: $decryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+
+            $expectedPlaintexts = [
+                'john@example.com',
+                '29',
+                'Software Engineer',
+                '{"city":"Boston","state":"MA"}',
+            ];
+
+            $this->assertEquals($expectedPlaintexts, $decryptResults);
         } finally {
             $client->freeClient($clientPtr);
         }
