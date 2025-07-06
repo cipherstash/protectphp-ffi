@@ -611,7 +611,18 @@ Returns the decrypted plaintext as a string.
 
 Provide additional encryption context for an additional layer of security by binding encrypted data to specific contextual information of your choosing. This prevents data encrypted with one context from being decrypted with a different context, even when using the same encryption keys.
 
-Protect.php FFI supports three types of encryption context:
+**Context Types**
+
+The `context` parameter determines what contextual authentication is supported on encrypted data:
+
+| Context Type | Supported Index Types | Description |
+|--------------|----------------------|-------------|
+| `identity_claim` | `unique`, `ore`, `match` | Identity-aware encryption using JWT claims (requires CTS authentication) |
+| `tag` | `unique`, `ore`, `match` | Label-aware encryption using string tags |
+| `value` | `unique`, `ore`, `match` | Attribute-aware encryption using key-value pairs |
+
+> [!IMPORTANT]  
+> Encryption context is not supported with `ste_vec` indexes and will cause decryption to fail.
 
 #### Identity Claim Context
 
@@ -739,7 +750,7 @@ For improved performance when handling multiple records, use bulk encryption and
 
 #### Bulk Encryption
 
-Encrypt multiple plaintext strings using the `encryptBulk()` method. This method accepts a client pointer and a JSON array of objects, where each object specifies the `plaintext`, `column`, and `table` for encryption:
+Encrypt multiple plaintext strings using the `encryptBulk()` method. This method accepts a client pointer and a JSON array of objects, where each object specifies the `plaintext`, `column`, `table`, and optional `context` for encryption:
 
 ```php
 use CipherStash\Protect\FFI\Client;
@@ -803,7 +814,7 @@ Returns a JSON array where each element follows the same structure as documented
 
 #### Bulk Decryption
 
-Decrypt multiple ciphertext strings using the `decryptBulk()` method. This method accepts a client pointer and a JSON array of objects, where each object contains a `ciphertext` key with the base85-encoded ciphertext string:
+Decrypt multiple ciphertext strings using the `decryptBulk()` method. This method accepts a client pointer and a JSON array of objects, where each object contains a `ciphertext` with the base85-encoded ciphertext string and an optional `context` for decryption:
 
 ```php
 use CipherStash\Protect\FFI\Client;
@@ -839,6 +850,9 @@ try {
             'plaintext' => 'john@example.com',
             'column' => 'email',
             'table' => 'patient_records',
+            'context' => [
+                'tag' => ['pii', 'hipaa'],
+            ],
         ],
         [
             'plaintext' => 'Patient shows improvement in mobility and pain management.',
@@ -848,25 +862,30 @@ try {
     ];
 
     $itemsJson = json_encode($items, JSON_THROW_ON_ERROR);
-    $resultJson = $client->encryptBulk($clientPtr, $itemsJson);
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
-    $ciphertexts = array_column($result, 'c');
+    $encryptResultJson = $client->encryptBulk($clientPtr, $itemsJson);
+    $encryptResults = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
-    $ciphertextItems = array_map(function ($ciphertext) {
-        return ['ciphertext' => $ciphertext];
-    }, $ciphertexts);
+    $decryptItems = array_map(function ($item, $encryptResult) {
+        $decryptItem = ['ciphertext' => $encryptResult['c']];
 
-    $ciphertextItemsJson = json_encode($ciphertextItems, JSON_THROW_ON_ERROR);
+        if (isset($item['context'])) {
+            $decryptItem['context'] = $item['context'];
+        }
 
-    echo $ciphertextItemsJson;
-    // [{"ciphertext":"mBbK>BcAYctW$Gy)vK2)Y$&nBBKz{oL1..."},{"ciphertext":"mBbJ<8tOEI+Z`KFUV`q&kmdWtO#DKxW|..."}]
+        return $decryptItem;
+    }, $items, $encryptResults);
 
-    $decryptedResultJson = $client->decryptBulk($clientPtr, $ciphertextItemsJson);
+    $decryptItemsJson = json_encode($decryptItems, JSON_THROW_ON_ERROR);
 
-    echo $decryptedResultJson;
+    echo $decryptItemsJson;
+    // [{"ciphertext":"mBbK>BcAYctW$Gy)vK2)Y$&nBBKz{oL1...","context":{"tag":["pii","hipaa"]}},{"ciphertext":"mBbJ<8tOEI+Z`KFUV`q&kmdWtO#DKxW|..."}]
+
+    $decryptResultJson = $client->decryptBulk($clientPtr, $decryptItemsJson);
+
+    echo $decryptResultJson;
     // ["john@example.com","Patient shows improvement in mobility and pain management."]
 
-    $plaintexts = json_decode(json: $decryptedResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $decryptResults = json_decode(json: $decryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 } finally {
     $client->freeClient($clientPtr);
 }
@@ -876,7 +895,7 @@ Returns a JSON array of decrypted plaintext strings in the same order as the inp
 
 ### Searchable Encryption
 
-Create search terms that enable querying encrypted data without decryption using the `createSearchTerms()` method. This method accepts a client pointer and a JSON array of objects, where each object specifies the `plaintext`, `column`, and `table` for generating search terms:
+Create search terms that enable querying encrypted data without decryption using the `createSearchTerms()` method. This method accepts a client pointer and a JSON array of objects, where each object specifies the `plaintext`, `column`, `table`, and optional `context` for generating search terms:
 
 ```php
 use CipherStash\Protect\FFI\Client;
@@ -912,6 +931,9 @@ try {
             'plaintext' => 'john@example.com',
             'column' => 'email',
             'table' => 'patient_records',
+            'context' => [
+                'tag' => ['pii', 'hipaa'],
+            ],
         ],
         [
             'plaintext' => '120',
