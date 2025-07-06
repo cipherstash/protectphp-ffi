@@ -109,7 +109,7 @@ The `cast_as` parameter determines how plaintext data is processed before encryp
 | `text` | String data | `john@example.com` |
 | `boolean` | Boolean values | `true` or `false` |
 | `small_int` | 16-bit integer numbers | `32767` |
-| `int` | 32-bit integer numbers | `29` |
+| `int` | 32-bit integer numbers | `2147483647` |
 | `big_int` | 64-bit integer numbers | `9223372036854775807` |
 | `real` | Single-precision floating point | `25.99` |
 | `double` | Double-precision floating point | `3.141592653589793` |
