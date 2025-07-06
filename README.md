@@ -460,16 +460,16 @@ $configJson = json_encode($config, JSON_THROW_ON_ERROR);
 $clientPtr = $client->newClient($configJson);
 
 try {
-    $resultJson = $client->encrypt(
+    $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
         tableName: 'patient_records',
     );
 
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
-    $ciphertext = $result['c'];
+    $ciphertext = $encryptResult['c'];
 
     echo $ciphertext;
     // mBbKlk}G7QdaGiNj$dL7#+AOrA^}*VJx...
@@ -585,20 +585,20 @@ $configJson = json_encode($config, JSON_THROW_ON_ERROR);
 $clientPtr = $client->newClient($configJson);
 
 try {
-    $resultJson = $client->encrypt(
+    $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
         tableName: 'patient_records',
     );
 
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
-    $ciphertext = $result['c'];
+    $ciphertext = $encryptResult['c'];
 
-    $plaintext = $client->decrypt($clientPtr, $ciphertext);
+    $decryptResult = $client->decrypt($clientPtr, $ciphertext);
 
-    echo $plaintext;
+    echo $decryptResult;
     // john@example.com
 } finally {
     $client->freeClient($clientPtr);
@@ -663,7 +663,7 @@ try {
 
     $contextJson = json_encode($context, JSON_THROW_ON_ERROR);
 
-    $resultJson = $client->encrypt(
+    $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
@@ -671,13 +671,13 @@ try {
         contextJson: $contextJson,
     );
 
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
-    $ciphertext = $result['c'];
+    $ciphertext = $encryptResult['c'];
 
-    $plaintext = $client->decrypt($clientPtr, $ciphertext, $contextJson);
+    $decryptResult = $client->decrypt($clientPtr, $ciphertext, $contextJson);
 
-    echo $plaintext;
+    echo $decryptResult;
     // john@example.com
 } finally {
     $client->freeClient($clientPtr);
@@ -720,7 +720,7 @@ try {
 
     $contextJson = json_encode($context, JSON_THROW_ON_ERROR);
 
-    $resultJson = $client->encrypt(
+    $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
@@ -728,13 +728,13 @@ try {
         contextJson: $contextJson,
     );
 
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
-    $ciphertext = $result['c'];
+    $ciphertext = $encryptResult['c'];
 
-    $plaintext = $client->decrypt($clientPtr, $ciphertext, $contextJson);
+    $decryptResult = $client->decrypt($clientPtr, $ciphertext, $contextJson);
 
-    echo $plaintext;
+    echo $decryptResult;
     // john@example.com
 } finally {
     $client->freeClient($clientPtr);
@@ -795,12 +795,12 @@ try {
     ];
 
     $itemsJson = json_encode($items, JSON_THROW_ON_ERROR);
-    $resultJson = $client->encryptBulk($clientPtr, $itemsJson);
+    $encryptResultJson = $client->encryptBulk($clientPtr, $itemsJson);
 
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $encryptResults = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
-    foreach ($result as $encryptedData) {
-        $ciphertext = $encryptedData['c'];
+    foreach ($encryptResults as $encryptResult) {
+        $ciphertext = $encryptResult['c'];
 
         echo $ciphertext;
         // mBbKuXT|+vBh~K2WV-!n5_W3DBFd4`Mp...
@@ -926,7 +926,7 @@ $configJson = json_encode($config, JSON_THROW_ON_ERROR);
 $clientPtr = $client->newClient($configJson);
 
 try {
-    $terms = [
+    $searchTerms = [
         [
             'plaintext' => 'john@example.com',
             'column' => 'email',
@@ -942,11 +942,11 @@ try {
         ],
     ];
 
-    $termsJson = json_encode($terms, JSON_THROW_ON_ERROR);
-    $resultJson = $client->createSearchTerms($clientPtr, $termsJson);
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $searchTermsJson = json_encode($searchTerms, JSON_THROW_ON_ERROR);
+    $searchTermsResultJson = $client->createSearchTerms($clientPtr, $searchTermsJson);
+    $searchTermsResult = json_decode(json: $searchTermsResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
-    foreach ($result as $searchTerms) {
+    foreach ($searchTermsResult as $searchTerms) {
         echo json_encode($searchTerms);
         // {"hm":"f3ca71fd39ae9d3d1d1fc25141bcb6da...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"}}
     }
@@ -1056,15 +1056,15 @@ try {
     $configJson = json_encode($config, JSON_THROW_ON_ERROR);
     $clientPtr = $client->newClient($configJson);
 
-    $resultJson = $client->encrypt(
+    $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
         tableName: 'patient_records',
     );
 
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
-    $ciphertext = $result['c'];
+    $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $ciphertext = $encryptResult['c'];
 
     echo $ciphertext;
     // mBbKlk}G7QdaGiNj$dL7#+AOrA^}*VJx...
