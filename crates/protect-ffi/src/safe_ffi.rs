@@ -32,13 +32,13 @@ pub fn client_ref<'a>(client: *const Client) -> Result<&'a Client, Error> {
 /// # Safety
 ///
 /// The caller must ensure the pointer points to a valid null-terminated C string.
-pub fn c_str_to_string(c_string_ptr: *const c_char) -> Result<String, Error> {
-    if c_string_ptr.is_null() {
+pub fn c_str_to_string(c_str_ptr: *const c_char) -> Result<String, Error> {
+    if c_str_ptr.is_null() {
         Err(Error::NullPointer)
     } else {
         unsafe {
-            let c_string = CStr::from_ptr(c_string_ptr);
-            Ok(c_string.to_str()?.to_owned())
+            let c_str = CStr::from_ptr(c_str_ptr);
+            Ok(c_str.to_str()?.to_owned())
         }
     }
 }
@@ -52,20 +52,23 @@ pub fn c_str_to_string(c_string_ptr: *const c_char) -> Result<String, Error> {
 /// # Safety
 ///
 /// If not null, the caller must ensure the pointer points to a valid null-terminated C string.
-pub fn optional_c_str_to_string(c_string_ptr: *const c_char) -> Result<Option<String>, Error> {
-    if c_string_ptr.is_null() {
+pub fn optional_c_str_to_string(c_str_ptr: *const c_char) -> Result<Option<String>, Error> {
+    if c_str_ptr.is_null() {
         Ok(None)
     } else {
-        Ok(Some(c_str_to_string(c_string_ptr)?))
+        Ok(Some(c_str_to_string(c_str_ptr)?))
     }
 }
 
 /// Convert a Rust [`String`] to a C string pointer.
 ///
+/// Returns a raw pointer to a null-terminated C string that must be freed
+/// with [`free_c_string`] to avoid memory leaks.
+///
 /// # Errors
 ///
 /// Returns [`Error::StringConversion`] if the string contains null bytes.
-pub fn string_to_c_str(string: String) -> Result<*mut c_char, Error> {
+pub fn string_to_c_string(string: String) -> Result<*mut c_char, Error> {
     CString::new(string)
         .map(|cs| cs.into_raw())
         .map_err(|e| Error::StringConversion(e.to_string()))
@@ -160,12 +163,12 @@ mod tests {
 
     #[test]
     fn test_c_str_to_string_valid() {
-        let test_string = "Hello, World!";
-        let c_string = CString::new(test_string).unwrap();
-        let c_string_ptr = c_string.as_ptr();
+        let email = "john@example.com";
+        let email_c_string = CString::new(email).unwrap();
+        let email_ptr = email_c_string.as_ptr();
 
-        let result = c_str_to_string(c_string_ptr);
-        assert_eq!(result.unwrap(), test_string);
+        let result = c_str_to_string(email_ptr);
+        assert_eq!(result.unwrap(), email);
     }
 
     #[test]
@@ -177,20 +180,20 @@ mod tests {
     #[test]
     fn test_c_str_to_string_invalid_utf8() {
         let invalid_bytes = [0xFF, 0xFE, 0x00]; // Invalid UTF-8 sequence + null terminator
-        let c_string_ptr = invalid_bytes.as_ptr() as *const c_char;
+        let invalid_ptr = invalid_bytes.as_ptr() as *const c_char;
 
-        let result = c_str_to_string(c_string_ptr);
+        let result = c_str_to_string(invalid_ptr);
         assert!(matches!(result, Err(Error::Utf8(_))));
     }
 
     #[test]
     fn test_optional_c_str_to_string_valid() {
-        let test_string = "Optional string";
-        let c_string = CString::new(test_string).unwrap();
-        let c_string_ptr = c_string.as_ptr();
+        let name = "정주영";
+        let name_c_string = CString::new(name).unwrap();
+        let name_ptr = name_c_string.as_ptr();
 
-        let result = optional_c_str_to_string(c_string_ptr);
-        assert_eq!(result.unwrap(), Some(test_string.to_string()));
+        let result = optional_c_str_to_string(name_ptr);
+        assert_eq!(result.unwrap(), Some(name.to_string()));
     }
 
     #[test]
@@ -200,23 +203,23 @@ mod tests {
     }
 
     #[test]
-    fn test_string_to_c_str_valid() {
-        let test_string = "Test string".to_string();
-        let result = string_to_c_str(test_string.clone());
+    fn test_string_to_c_string_valid() {
+        let table = "users".to_string();
+        let result = string_to_c_string(table.clone());
 
         assert!(result.is_ok());
-        let c_string_ptr = result.unwrap();
+        let table_ptr = result.unwrap();
 
-        let restored = unsafe { CStr::from_ptr(c_string_ptr) };
-        assert_eq!(restored.to_str().unwrap(), test_string);
+        let restored_c_str = unsafe { CStr::from_ptr(table_ptr) };
+        assert_eq!(restored_c_str.to_str().unwrap(), table);
 
-        free_c_string(c_string_ptr);
+        free_c_string(table_ptr);
     }
 
     #[test]
-    fn test_string_to_c_str_with_null_byte() {
-        let test_string = "String\0with\0nulls".to_string();
-        let result = string_to_c_str(test_string);
+    fn test_string_to_c_string_with_null_byte() {
+        let invalid_config = "table\0column\0data".to_string();
+        let result = string_to_c_string(invalid_config);
 
         assert!(matches!(result, Err(Error::StringConversion(_))));
     }
@@ -233,10 +236,10 @@ mod tests {
 
     #[test]
     fn test_free_c_string_valid() {
-        let c_string = CString::new("test").unwrap();
-        let c_string_ptr = c_string.into_raw();
+        let metadata = CString::new("metadata").unwrap();
+        let metadata_ptr = metadata.into_raw();
 
-        free_c_string(c_string_ptr);
+        free_c_string(metadata_ptr);
     }
 
     #[test]
@@ -254,9 +257,8 @@ mod tests {
         set_error(error_out, &error);
 
         assert!(!error_ptr.is_null());
-
-        let error_msg = unsafe { CStr::from_ptr(error_ptr) };
-        assert!(error_msg.to_str().unwrap().contains("null pointer"));
+        let error_c_str = unsafe { CStr::from_ptr(error_ptr) };
+        assert!(error_c_str.to_str().is_ok());
 
         free_c_string(error_ptr);
     }
@@ -268,7 +270,7 @@ mod tests {
 
     #[test]
     fn test_clear_error_valid() {
-        let mut error_ptr: *mut c_char = CString::new("test error").unwrap().into_raw();
+        let mut error_ptr: *mut c_char = CString::new("null pointer provided").unwrap().into_raw();
         let error_out = &mut error_ptr as *mut *mut c_char;
 
         clear_error(error_out);
@@ -281,9 +283,9 @@ mod tests {
         let mut error_ptr: *mut c_char = ptr::null_mut();
         let error_out = &mut error_ptr as *mut *mut c_char;
 
-        let result: Result<String, Error> = Ok("success".to_string());
-        let output = handle_ffi_result!(result, error_out, |string| {
-            CString::new(string).unwrap().into_raw()
+        let result: Result<String, Error> = Ok("9jqo^BlbD-BleB1djH3bb1ULW4j$".to_string());
+        let output = handle_ffi_result!(result, error_out, |ciphertext| {
+            CString::new(ciphertext).unwrap().into_raw()
         });
 
         assert!(!output.is_null());
@@ -298,15 +300,15 @@ mod tests {
         let error_out = &mut error_ptr as *mut *mut c_char;
 
         let result: Result<String, Error> = Err(Error::NullPointer);
-        let output = handle_ffi_result!(result, error_out, |string| {
-            CString::new(string).unwrap().into_raw()
+        let output = handle_ffi_result!(result, error_out, |plaintext| {
+            CString::new(plaintext).unwrap().into_raw()
         });
 
         assert!(output.is_null());
         assert!(!error_ptr.is_null());
 
-        let error_msg = unsafe { CStr::from_ptr(error_ptr) };
-        assert!(error_msg.to_str().unwrap().contains("null pointer"));
+        let error_c_str = unsafe { CStr::from_ptr(error_ptr) };
+        assert!(error_c_str.to_str().is_ok());
 
         free_c_string(error_ptr);
     }

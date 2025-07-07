@@ -266,10 +266,58 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn parse(json: serde_json::Value) -> HashMap<Identifier, (ColumnConfig, CastAs)> {
+    /// Parse valid JSON configuration into a [`HashMap`] mapping [`Identifier`] to
+    /// [`ColumnConfig`] for test assertions.
+    fn parse_config(json: serde_json::Value) -> HashMap<Identifier, (ColumnConfig, CastAs)> {
         serde_json::from_value::<EncryptConfig>(json)
-            .map(|config| config.into_config_map())
-            .unwrap()
+            .expect("valid config JSON")
+            .into_config_map()
+    }
+
+    /// Create a minimal valid configuration JSON with a single column for testing.
+    fn minimal_config(table: &str, column: &str, cast_as: &str) -> serde_json::Value {
+        json!({
+            "v": 2,
+            "tables": {
+                table: {
+                    column: {
+                        "cast_as": cast_as
+                    }
+                }
+            }
+        })
+    }
+
+    /// Create a configuration JSON with encryption indexes for testing.
+    fn config_with_indexes(
+        table: &str,
+        column: &str,
+        cast_as: &str,
+        indexes: serde_json::Value,
+    ) -> serde_json::Value {
+        json!({
+            "v": 2,
+            "tables": {
+                table: {
+                    column: {
+                        "cast_as": cast_as,
+                        "indexes": indexes
+                    }
+                }
+            }
+        })
+    }
+
+    /// Retrieve column configuration from parsed configuration map for test assertions.
+    fn get_column_config<'a>(
+        parsed_config: &'a HashMap<Identifier, (ColumnConfig, CastAs)>,
+        table: &str,
+        column: &str,
+    ) -> &'a (ColumnConfig, CastAs) {
+        let identifier = Identifier::new(table, column);
+        parsed_config
+            .get(&identifier)
+            .expect("column should exist in config")
     }
 
     #[test]
@@ -292,139 +340,198 @@ mod tests {
     }
 
     #[test]
-    fn test_basic_config_parsing() {
-        let json = json!({
-            "v": 2,
-            "tables": {
-                "users": {
-                    "email": {
-                        "cast_as": "text"
-                    }
-                }
-            }
-        });
+    fn test_cast_as_to_column_type_conversion() {
+        let test_cases = [
+            (CastAs::Text, ColumnType::Utf8Str),
+            (CastAs::Boolean, ColumnType::Boolean),
+            (CastAs::SmallInt, ColumnType::SmallInt),
+            (CastAs::Int, ColumnType::Int),
+            (CastAs::BigInt, ColumnType::BigInt),
+            (CastAs::Real, ColumnType::Float),
+            (CastAs::Double, ColumnType::Float),
+            (CastAs::Date, ColumnType::Date),
+            (CastAs::JsonB, ColumnType::JsonB),
+        ];
 
-        let encrypt_config = parse(json);
-        let identifier = Identifier::new("users", "email");
-        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
-
-        assert_eq!(column.cast_type, ColumnType::Utf8Str);
-        assert_eq!(column.name, "email");
-        assert_eq!(*cast_as, CastAs::Text);
+        for (cast_as, expected_column_type) in test_cases {
+            assert_eq!(ColumnType::from(cast_as), expected_column_type);
+        }
     }
 
     #[test]
-    fn test_unique_index() {
-        let json = json!({
-            "v": 2,
+    fn test_identifier_creation() {
+        let id = Identifier::new("orders", "customer_id");
+        assert_eq!(id.table, "orders");
+        assert_eq!(id.column, "customer_id");
+    }
+
+    #[test]
+    fn test_identifier_creation_with_unicode() {
+        let id = Identifier::new("ユーザー", "名前");
+        assert_eq!(id.table, "ユーザー");
+        assert_eq!(id.column, "名前");
+    }
+
+    #[test]
+    fn test_supported_schema_versions() {
+        for &version in SUPPORTED_SCHEMA_VERSIONS {
+            let config_json = json!({
+                "v": version,
+                "tables": {}
+            });
+            let result = EncryptConfig::from_str(&config_json.to_string());
+            assert!(result.is_ok());
+        }
+    }
+
+    #[test]
+    fn test_config_parsing_missing_version_fails() {
+        let invalid_json = json!({
             "tables": {
                 "users": {
-                    "email": {
-                        "cast_as": "text",
-                        "indexes": {
-                            "unique": {}
-                        }
-                    }
+                    "email": {"cast_as": "text"}
                 }
             }
         });
 
-        let encrypt_config = parse(json);
-        let identifier = Identifier::new("users", "email");
-        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
+        let result = serde_json::from_value::<EncryptConfig>(invalid_json);
+        assert!(result.is_err());
+    }
 
+    #[test]
+    fn test_config_parsing_unsupported_version_fails() {
+        let invalid_json = json!({
+            "v": 1,
+            "tables": {
+                "users": {
+                    "email": {"cast_as": "text"}
+                }
+            }
+        });
+
+        let result = EncryptConfig::from_str(&invalid_json.to_string());
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            crate::Error::UnsupportedSchemaVersion(version) => {
+                assert_eq!(version, 1);
+            }
+            other => panic!(
+                "expected `UnsupportedSchemaVersion` error, got: {:?}",
+                other
+            ),
+        }
+    }
+
+    #[test]
+    fn test_basic_config_parsing() {
+        let config = minimal_config("users", "name", "text");
+        let parsed_config = parse_config(config);
+        let (column_config, cast_as) = get_column_config(&parsed_config, "users", "name");
+
+        assert_eq!(column_config.cast_type, ColumnType::Utf8Str);
+        assert_eq!(column_config.name, "name");
+        assert_eq!(*cast_as, CastAs::Text);
+        assert!(column_config.indexes.is_empty());
+    }
+
+    #[test]
+    fn test_config_parsing_all_cast_types() {
+        let cast_types = [
+            ("text", CastAs::Text, ColumnType::Utf8Str),
+            ("boolean", CastAs::Boolean, ColumnType::Boolean),
+            ("small_int", CastAs::SmallInt, ColumnType::SmallInt),
+            ("int", CastAs::Int, ColumnType::Int),
+            ("big_int", CastAs::BigInt, ColumnType::BigInt),
+            ("real", CastAs::Real, ColumnType::Float),
+            ("double", CastAs::Double, ColumnType::Float),
+            ("date", CastAs::Date, ColumnType::Date),
+            ("jsonb", CastAs::JsonB, ColumnType::JsonB),
+        ];
+
+        for (cast_as, expected_cast, expected_type) in cast_types {
+            let config_json = minimal_config("products", "value", cast_as);
+            let parsed_config = parse_config(config_json);
+            let (column_config, cast_as) = get_column_config(&parsed_config, "products", "value");
+
+            assert_eq!(*cast_as, expected_cast);
+            assert_eq!(column_config.cast_type, expected_type);
+        }
+    }
+
+    #[test]
+    fn test_empty_config() {
+        let config_json = json!({
+            "v": 2,
+            "tables": {}
+        });
+        let parsed_config = parse_config(config_json);
+
+        assert!(parsed_config.is_empty());
+    }
+
+    #[test]
+    fn test_unique_index_basic() {
+        let indexes = json!({"unique": {}});
+        let config_json = config_with_indexes("users", "email", "text", indexes);
+        let parsed_config = parse_config(config_json);
+        let (column_config, cast_as) = get_column_config(&parsed_config, "users", "email");
+
+        assert_eq!(column_config.indexes.len(), 1);
         assert_eq!(
-            column.indexes[0].index_type,
+            column_config.indexes[0].index_type,
             IndexType::Unique {
                 token_filters: vec![]
             }
         );
-
         assert_eq!(*cast_as, CastAs::Text);
     }
 
     #[test]
     fn test_unique_index_with_token_filters() {
-        let json = json!({
-            "v": 2,
-            "tables": {
-                "users": {
-                    "username": {
-                        "cast_as": "text",
-                        "indexes": {
-                            "unique": {
-                                "token_filters": [
-                                    {
-                                        "kind": "downcase"
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                }
+        let indexes = json!({
+            "unique": {
+                "token_filters": [
+                    {"kind": "downcase"}
+                ]
             }
         });
+        let config_json = config_with_indexes("users", "username", "text", indexes);
+        let parsed_config = parse_config(config_json);
+        let (column_config, cast_as) = get_column_config(&parsed_config, "users", "username");
 
-        let encrypt_config = parse(json);
-        let identifier = Identifier::new("users", "username");
-        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
-
+        assert_eq!(column_config.indexes.len(), 1);
         assert_eq!(
-            column.indexes[0].index_type,
+            column_config.indexes[0].index_type,
             IndexType::Unique {
                 token_filters: vec![TokenFilter::Downcase]
             }
         );
-
         assert_eq!(*cast_as, CastAs::Text);
     }
 
     #[test]
     fn test_ore_index() {
-        let json = json!({
-            "v": 2,
-            "tables": {
-                "users": {
-                    "age": {
-                        "cast_as": "int",
-                        "indexes": {
-                            "ore": {}
-                        }
-                    }
-                }
-            }
-        });
+        let indexes = json!({"ore": {}});
+        let config_json = config_with_indexes("users", "age", "int", indexes);
+        let parsed_config = parse_config(config_json);
+        let (column_config, cast_as) = get_column_config(&parsed_config, "users", "age");
 
-        let encrypt_config = parse(json);
-        let identifier = Identifier::new("users", "age");
-        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
-
-        assert_eq!(column.indexes[0].index_type, IndexType::Ore);
+        assert_eq!(column_config.indexes.len(), 1);
+        assert_eq!(column_config.indexes[0].index_type, IndexType::Ore);
         assert_eq!(*cast_as, CastAs::Int);
     }
 
     #[test]
     fn test_match_index_defaults() {
-        let json = json!({
-            "v": 2,
-            "tables": {
-                "users": {
-                    "notes": {
-                        "cast_as": "text",
-                        "indexes": {
-                            "match": {}
-                        }
-                    }
-                }
-            }
-        });
+        let indexes = json!({"match": {}});
+        let config_json = config_with_indexes("posts", "content", "text", indexes);
+        let parsed_config = parse_config(config_json);
+        let (column_config, cast_as) = get_column_config(&parsed_config, "posts", "content");
 
-        let encrypt_config = parse(json);
-        let identifier = Identifier::new("users", "notes");
-        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
-
+        assert_eq!(column_config.indexes.len(), 1);
         assert_eq!(
-            column.indexes[0].index_type,
+            column_config.indexes[0].index_type,
             IndexType::Match {
                 tokenizer: Tokenizer::Standard,
                 token_filters: vec![],
@@ -433,45 +540,32 @@ mod tests {
                 include_original: false
             }
         );
-
         assert_eq!(*cast_as, CastAs::Text);
     }
 
     #[test]
     fn test_match_index_custom_options() {
-        let json = json!({
-            "v": 2,
-            "tables": {
-                "users": {
-                    "description": {
-                        "cast_as": "text",
-                        "indexes": {
-                            "match": {
-                                "tokenizer": {
-                                    "kind": "ngram",
-                                    "token_length": 3,
-                                },
-                                "token_filters": [
-                                    {
-                                        "kind": "downcase"
-                                    }
-                                ],
-                                "k": 8,
-                                "m": 1024,
-                                "include_original": true
-                            }
-                        }
-                    }
-                }
+        let indexes = json!({
+            "match": {
+                "tokenizer": {
+                    "kind": "ngram",
+                    "token_length": 3,
+                },
+                "token_filters": [
+                    {"kind": "downcase"}
+                ],
+                "k": 8,
+                "m": 1024,
+                "include_original": true
             }
         });
+        let config_json = config_with_indexes("articles", "description", "text", indexes);
+        let parsed_config = parse_config(config_json);
+        let (column_config, cast_as) = get_column_config(&parsed_config, "articles", "description");
 
-        let encrypt_config = parse(json);
-        let identifier = Identifier::new("users", "description");
-        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
-
+        assert_eq!(column_config.indexes.len(), 1);
         assert_eq!(
-            column.indexes[0].index_type,
+            column_config.indexes[0].index_type,
             IndexType::Match {
                 tokenizer: Tokenizer::Ngram { token_length: 3 },
                 token_filters: vec![TokenFilter::Downcase],
@@ -480,112 +574,140 @@ mod tests {
                 include_original: true
             }
         );
-
         assert_eq!(*cast_as, CastAs::Text);
     }
 
     #[test]
     fn test_ste_vec_index() {
-        let json = json!({
-            "v": 2,
-            "tables": {
-                "documents": {
-                    "content": {
-                        "cast_as": "jsonb",
-                        "indexes": {
-                            "ste_vec": {
-                                "prefix": "documents.content"
-                            }
-                        }
-                    }
-                }
+        let indexes = json!({
+            "ste_vec": {
+                "prefix": "documents.metadata"
             }
         });
+        let config_json = config_with_indexes("documents", "metadata", "jsonb", indexes);
+        let parsed_config = parse_config(config_json);
+        let (column_config, cast_as) = get_column_config(&parsed_config, "documents", "metadata");
 
-        let encrypt_config = parse(json);
-        let identifier = Identifier::new("documents", "content");
-        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
-
+        assert_eq!(column_config.indexes.len(), 1);
         assert_eq!(
-            column.indexes[0].index_type,
+            column_config.indexes[0].index_type,
             IndexType::SteVec {
-                prefix: "documents.content".into()
+                prefix: "documents.metadata".into()
             }
         );
-
         assert_eq!(*cast_as, CastAs::JsonB);
     }
 
     #[test]
     fn test_multiple_indexes() {
-        let json = json!({
-            "v": 2,
-            "tables": {
-                "users": {
-                    "profile": {
-                        "cast_as": "text",
-                        "indexes": {
-                            "unique": {},
-                            "match": {}
-                        }
-                    }
-                }
-            }
+        let indexes = json!({
+            "unique": {},
+            "match": {}
         });
+        let config_json = config_with_indexes("users", "bio", "text", indexes);
+        let parsed_config = parse_config(config_json);
+        let (column_config, cast_as) = get_column_config(&parsed_config, "users", "bio");
 
-        let encrypt_config = parse(json);
-        let identifier = Identifier::new("users", "profile");
-        let (column, cast_as) = encrypt_config.get(&identifier).expect("column exists");
+        assert_eq!(column_config.indexes.len(), 2);
 
-        assert_eq!(column.indexes.len(), 2);
+        let index_types: Vec<_> = column_config
+            .indexes
+            .iter()
+            .map(|index| &index.index_type)
+            .collect();
 
-        assert!(matches!(
-            column.indexes[0].index_type,
-            IndexType::Unique { .. }
-        ));
+        let has_unique = index_types
+            .iter()
+            .any(|idx| matches!(idx, IndexType::Unique { .. }));
+        let has_match = index_types
+            .iter()
+            .any(|idx| matches!(idx, IndexType::Match { .. }));
 
-        assert!(matches!(
-            column.indexes[1].index_type,
-            IndexType::Match { .. }
-        ));
-
+        assert!(has_unique);
+        assert!(has_match);
         assert_eq!(*cast_as, CastAs::Text);
     }
 
     #[test]
-    fn test_config_parsing_missing_version_fails() {
-        let json = json!({
+    fn test_multiple_tables_and_columns() {
+        let config_json = json!({
+            "v": 2,
             "tables": {
                 "users": {
-                    "email": {
-                        "cast_as": "text"
-                    }
+                    "email": {"cast_as": "text"},
+                    "age": {"cast_as": "int"}
+                },
+                "posts": {
+                    "title": {"cast_as": "text"},
+                    "published": {"cast_as": "boolean"}
+                }
+            }
+        });
+        let parsed_config = parse_config(config_json);
+
+        assert_eq!(parsed_config.len(), 4);
+
+        let (email_config, email_cast) = get_column_config(&parsed_config, "users", "email");
+        assert_eq!(*email_cast, CastAs::Text);
+        assert_eq!(email_config.name, "email");
+
+        let (age_config, age_cast) = get_column_config(&parsed_config, "users", "age");
+        assert_eq!(*age_cast, CastAs::Int);
+        assert_eq!(age_config.name, "age");
+
+        let (title_config, title_cast) = get_column_config(&parsed_config, "posts", "title");
+        assert_eq!(*title_cast, CastAs::Text);
+        assert_eq!(title_config.name, "title");
+
+        let (published_config, published_cast) =
+            get_column_config(&parsed_config, "posts", "published");
+        assert_eq!(*published_cast, CastAs::Boolean);
+        assert_eq!(published_config.name, "published");
+    }
+
+    #[test]
+    fn test_config_with_unicode_table_and_column_names() {
+        let config_json = json!({
+            "v": 2,
+            "tables": {
+                "ユーザー": {
+                    "名前": {"cast_as": "text"}
+                }
+            }
+        });
+        let parsed_config = parse_config(config_json);
+        let (column_config, cast_as) = get_column_config(&parsed_config, "ユーザー", "名前");
+
+        assert_eq!(*cast_as, CastAs::Text);
+        assert_eq!(column_config.name, "名前");
+    }
+
+    #[test]
+    fn test_config_parsing_invalid_cast_type_fails() {
+        let invalid_json = json!({
+            "v": 2,
+            "tables": {
+                "users": {
+                    "email": {"cast_as": "invalid_type"}
                 }
             }
         });
 
-        let result = serde_json::from_value::<EncryptConfig>(json);
+        let result = serde_json::from_value::<EncryptConfig>(invalid_json);
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_config_parsing_unsupported_version_fails() {
-        let json = json!({
-            "v": 1,
-            "tables": {
-                "users": {
-                    "email": {
-                        "cast_as": "text"
-                    }
-                }
-            }
-        });
-
-        let result = EncryptConfig::from_str(&json.to_string());
+    fn test_config_parsing_malformed_json_fails() {
+        let malformed_json = r#"{"v": 2, "tables": {"users": {"email": {"cast_as": "text""#;
+        let result = EncryptConfig::from_str(malformed_json);
         assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            crate::Error::UnsupportedSchemaVersion(1)
-        ));
+
+        match result.unwrap_err() {
+            crate::Error::Parse(_) => {
+                // Expected parse error
+            }
+            other => panic!("expected `Parse` error, got: {:?}", other),
+        }
     }
 }

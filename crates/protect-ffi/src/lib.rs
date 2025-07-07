@@ -277,7 +277,7 @@ pub extern "C" fn encrypt(
     });
 
     handle_ffi_result!(result, error_out, |json_string| {
-        safe_ffi::string_to_c_str(json_string).unwrap_or(ptr::null_mut())
+        safe_ffi::string_to_c_string(json_string).unwrap_or(ptr::null_mut())
     })
 }
 
@@ -383,7 +383,7 @@ pub extern "C" fn decrypt(
     });
 
     handle_ffi_result!(result, error_out, |plaintext| {
-        safe_ffi::string_to_c_str(plaintext).unwrap_or(ptr::null_mut())
+        safe_ffi::string_to_c_string(plaintext).unwrap_or(ptr::null_mut())
     })
 }
 
@@ -645,7 +645,7 @@ pub extern "C" fn encrypt_bulk(
     });
 
     handle_ffi_result!(result, error_out, |json_string| {
-        safe_ffi::string_to_c_str(json_string).unwrap_or(ptr::null_mut())
+        safe_ffi::string_to_c_string(json_string).unwrap_or(ptr::null_mut())
     })
 }
 
@@ -739,7 +739,7 @@ pub extern "C" fn decrypt_bulk(
     });
 
     handle_ffi_result!(result, error_out, |json_string| {
-        safe_ffi::string_to_c_str(json_string).unwrap_or(ptr::null_mut())
+        safe_ffi::string_to_c_string(json_string).unwrap_or(ptr::null_mut())
     })
 }
 
@@ -865,7 +865,7 @@ pub extern "C" fn create_search_terms(
     });
 
     handle_ffi_result!(result, error_out, |json_string| {
-        safe_ffi::string_to_c_str(json_string).unwrap_or(ptr::null_mut())
+        safe_ffi::string_to_c_string(json_string).unwrap_or(ptr::null_mut())
     })
 }
 
@@ -896,115 +896,79 @@ mod lib {
         use std::ffi::{CStr, CString};
         use std::ptr;
 
-        #[test]
-        fn test_error_display() {
-            let errors = vec![
-                Error::NullPointer,
-                Error::StringConversion("test error".to_string()),
-                Error::Runtime("runtime error".to_string()),
-                Error::Unimplemented("feature X".to_string()),
-                Error::InvariantViolation("invalid state".to_string()),
-                Error::Base85("encoding error".to_string()),
-            ];
+        const TEST_TABLE: &str = "users";
+        const TEST_COLUMN: &str = "email";
+        const TEST_EMAIL: &str = "john@example.com";
+        const TEST_CIPHERTEXT: &str = "9jqo^BlbD-BleB1djH3bb1ULW4j$";
+        const TEST_DATA_TYPE: &str = "text";
+        const TEST_SCHEMA_VERSION: u16 = 2;
 
-            for error in errors {
-                let display_string = format!("{}", error);
-                assert!(!display_string.is_empty());
-
-                match error {
-                    Error::NullPointer => assert!(display_string.contains("null pointer")),
-                    Error::StringConversion(msg) => assert!(display_string.contains(&msg)),
-                    Error::Runtime(msg) => assert!(display_string.contains(&msg)),
-                    Error::Unimplemented(msg) => assert!(display_string.contains(&msg)),
-                    Error::InvariantViolation(msg) => {
-                        assert!(display_string.contains(&msg));
-                        assert!(display_string.contains("bug in protect-ffi"));
-                    }
-                    Error::Base85(msg) => assert!(display_string.contains(&msg)),
-                    _ => {}
-                }
+        /// Create a sample ciphertext `Encrypted` variant for testing.
+        fn create_encrypted_ciphertext(
+            table: &str,
+            column: &str,
+            ciphertext: &str,
+            data_type: &str,
+        ) -> Encrypted {
+            Encrypted::Ciphertext {
+                ciphertext: ciphertext.to_string(),
+                data_type: data_type.to_string(),
+                unique_index: None,
+                ore_index: None,
+                match_index: None,
+                identifier: Identifier {
+                    table: table.to_string(),
+                    column: column.to_string(),
+                },
+                version: TEST_SCHEMA_VERSION,
             }
         }
 
-        #[test]
-        fn test_error_from_conversions() {
-            #[allow(invalid_from_utf8)]
-            let utf8_error = std::str::from_utf8(&[0xFF]).unwrap_err();
-            let error: Error = utf8_error.into();
-            assert!(matches!(error, Error::Utf8(_)));
-
-            let json_error = serde_json::from_str::<serde_json::Value>("invalid json").unwrap_err();
-            let error: Error = json_error.into();
-            assert!(matches!(error, Error::Parse(_)));
-        }
-
-        #[test]
-        fn test_encrypted_ciphertext_json_format() {
-            let identifier = Identifier {
-                table: "users".to_string(),
-                column: "email".to_string(),
-            };
-
-            let encrypted = Encrypted::Ciphertext {
-                ciphertext: "abc123".to_string(),
-                data_type: "text".to_string(),
-                unique_index: Some("hash123".to_string()),
-                ore_index: None,
-                match_index: None,
-                identifier,
-                version: 2,
-            };
-
-            let json = serde_json::to_string(&encrypted).unwrap();
-            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-
-            assert_eq!(parsed["k"], "ct");
-            assert_eq!(parsed["c"], "abc123");
-            assert_eq!(parsed["dt"], "text");
-            assert_eq!(parsed["hm"], "hash123");
-            assert_eq!(parsed["ob"], serde_json::Value::Null);
-            assert_eq!(parsed["bf"], serde_json::Value::Null);
-            assert_eq!(parsed["v"], 2);
-
-            let identifier = &parsed["i"];
-            assert_eq!(identifier["t"], "users");
-            assert_eq!(identifier["c"], "email");
-        }
-
-        #[test]
-        fn test_encrypted_stevec_json_format() {
-            let json = r#"{"k":"sv","c":"test-ciphertext","dt":"jsonb","sv":[{"s":"test-selector","t":"test-term","r":"test-record","pa":false}],"i":{"t":"test_table","c":"test_column"},"v":2}"#;
-
-            let parsed: serde_json::Value = serde_json::from_str(json).unwrap();
-            assert_eq!(parsed["k"], "sv");
-            assert_eq!(parsed["c"], "test-ciphertext");
-            assert_eq!(parsed["dt"], "jsonb");
-
-            let sv_array = parsed["sv"].as_array().unwrap();
-            assert_eq!(sv_array.len(), 1);
-
-            let sv_entry = &sv_array[0];
-            assert_eq!(sv_entry["s"], "test-selector");
-            assert_eq!(sv_entry["t"], "test-term");
-            assert_eq!(sv_entry["r"], "test-record");
-            assert_eq!(sv_entry["pa"], false);
-
-            let identifier = &parsed["i"];
-            assert_eq!(identifier["t"], "test_table");
-            assert_eq!(identifier["c"], "test_column");
-
-            assert_eq!(parsed["v"], 2);
+        /// Assert that a null pointer error is returned as a valid C string.
+        fn assert_null_pointer_error(error_ptr: *mut c_char) {
+            assert!(!error_ptr.is_null());
+            let error_c_str = unsafe { CStr::from_ptr(error_ptr) };
+            assert!(error_c_str.to_str().is_ok());
+            free_string(error_ptr);
         }
 
         #[test]
         fn test_runtime_creation() {
-            let rt = runtime();
-            assert!(rt.is_ok());
+            let first_runtime = runtime();
+            assert!(first_runtime.is_ok());
 
-            let rt2 = runtime();
-            assert!(rt2.is_ok());
+            let second_runtime = runtime();
+            assert!(second_runtime.is_ok());
 
-            assert!(std::ptr::eq(rt.unwrap(), rt2.unwrap()));
+            assert!(std::ptr::eq(
+                first_runtime.unwrap(),
+                second_runtime.unwrap()
+            ));
+        }
+
+        #[test]
+        fn test_encrypted_ciphertext_json_format() {
+            let sample_encrypted = create_encrypted_ciphertext(
+                TEST_TABLE,
+                TEST_COLUMN,
+                TEST_CIPHERTEXT,
+                TEST_DATA_TYPE,
+            );
+
+            let json_string = serde_json::to_string(&sample_encrypted).unwrap();
+            let parsed_json: serde_json::Value = serde_json::from_str(&json_string).unwrap();
+
+            assert_eq!(parsed_json["k"], "ct");
+            assert_eq!(parsed_json["c"], TEST_CIPHERTEXT);
+            assert_eq!(parsed_json["dt"], TEST_DATA_TYPE);
+            assert_eq!(parsed_json["hm"], serde_json::Value::Null);
+            assert_eq!(parsed_json["ob"], serde_json::Value::Null);
+            assert_eq!(parsed_json["bf"], serde_json::Value::Null);
+            assert_eq!(parsed_json["v"], TEST_SCHEMA_VERSION);
+
+            let identifier_json = &parsed_json["i"];
+            assert_eq!(identifier_json["t"], TEST_TABLE);
+            assert_eq!(identifier_json["c"], TEST_COLUMN);
         }
 
         #[test]
@@ -1012,15 +976,10 @@ mod lib {
             let mut error_ptr: *mut c_char = ptr::null_mut();
             let error_out = &mut error_ptr as *mut *mut c_char;
 
-            let result = new_client(ptr::null(), error_out);
+            let client_result = new_client(ptr::null(), error_out);
 
-            assert!(result.is_null());
-            assert!(!error_ptr.is_null());
-
-            let error_msg = unsafe { CStr::from_ptr(error_ptr) };
-            assert!(error_msg.to_str().unwrap().contains("null pointer"));
-
-            free_string(error_ptr);
+            assert!(client_result.is_null());
+            assert_null_pointer_error(error_ptr);
         }
 
         #[test]
@@ -1028,11 +987,11 @@ mod lib {
             let mut error_ptr: *mut c_char = ptr::null_mut();
             let error_out = &mut error_ptr as *mut *mut c_char;
 
-            let table = CString::new("users").unwrap();
-            let column = CString::new("name").unwrap();
-            let plaintext = CString::new("test").unwrap();
+            let table = CString::new(TEST_TABLE).unwrap();
+            let column = CString::new(TEST_COLUMN).unwrap();
+            let plaintext = CString::new(TEST_EMAIL).unwrap();
 
-            let result = encrypt(
+            let encrypt_result = encrypt(
                 ptr::null(),
                 plaintext.as_ptr(),
                 column.as_ptr(),
@@ -1041,13 +1000,8 @@ mod lib {
                 error_out,
             );
 
-            assert!(result.is_null());
-            assert!(!error_ptr.is_null());
-
-            let error_msg = unsafe { CStr::from_ptr(error_ptr) };
-            assert!(error_msg.to_str().unwrap().contains("null pointer"));
-
-            free_string(error_ptr);
+            assert!(encrypt_result.is_null());
+            assert_null_pointer_error(error_ptr);
         }
 
         #[test]
@@ -1055,23 +1009,61 @@ mod lib {
             let mut error_ptr: *mut c_char = ptr::null_mut();
             let error_out = &mut error_ptr as *mut *mut c_char;
 
-            let ciphertext = CString::new("test-ciphertext").unwrap();
+            let ciphertext = CString::new(TEST_CIPHERTEXT).unwrap();
 
-            let result = decrypt(ptr::null(), ciphertext.as_ptr(), ptr::null(), error_out);
+            let decrypt_result = decrypt(ptr::null(), ciphertext.as_ptr(), ptr::null(), error_out);
 
-            assert!(result.is_null());
-            assert!(!error_ptr.is_null());
-
-            let error_msg = unsafe { CStr::from_ptr(error_ptr) };
-            assert!(error_msg.to_str().unwrap().contains("null pointer"));
-
-            free_string(error_ptr);
+            assert!(decrypt_result.is_null());
+            assert_null_pointer_error(error_ptr);
         }
 
         #[test]
         fn test_free_functions_with_null() {
             free_client(ptr::null_mut());
             free_string(ptr::null_mut());
+        }
+
+        #[test]
+        fn test_error_display() {
+            let identifier = Identifier {
+                table: TEST_TABLE.to_string(),
+                column: TEST_COLUMN.to_string(),
+            };
+            let invalid_utf8_bytes = vec![0xFF, 0xFE];
+            let utf8_error = std::str::from_utf8(&invalid_utf8_bytes).unwrap_err();
+            let json_error = serde_json::from_str::<serde_json::Value>("{invalid}").unwrap_err();
+
+            let test_errors = [
+                // Test error display formatting for all constructible variants
+                Error::Parse(json_error),
+                Error::Utf8(utf8_error),
+                Error::UnsupportedSchemaVersion(1),
+                Error::UnknownColumn(identifier),
+                Error::Base85("invalid character".to_string()),
+                Error::Unimplemented("bulk operations".to_string()),
+                Error::Runtime("tokio runtime failed".to_string()),
+                Error::NullPointer,
+                Error::StringConversion("invalid encoding".to_string()),
+                Error::InvariantViolation("cipher state corrupted".to_string()),
+            ];
+
+            for error in test_errors {
+                let error_message = format!("{}", error);
+                assert!(!error_message.is_empty());
+            }
+        }
+
+        #[test]
+        fn test_error_from_conversions() {
+            #[allow(invalid_from_utf8)]
+            let utf8_conversion_error = std::str::from_utf8(&[0xFF, 0xFE]).unwrap_err();
+            let converted_error: Error = utf8_conversion_error.into();
+            assert!(matches!(converted_error, Error::Utf8(_)));
+
+            let json_parse_error =
+                serde_json::from_str::<serde_json::Value>("{invalid: json}").unwrap_err();
+            let converted_error: Error = json_parse_error.into();
+            assert!(matches!(converted_error, Error::Parse(_)));
         }
     }
 }

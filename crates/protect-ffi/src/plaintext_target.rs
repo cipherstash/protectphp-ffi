@@ -38,14 +38,36 @@ pub fn new(plaintext: String, column_config: &ColumnConfig) -> Result<PlaintextT
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn test_json_parsing_logic() {
-        let valid_json = r#"{"key": "value"}"#;
-        let result = serde_json::from_str::<serde_json::Value>(valid_json);
-        assert!(result.is_ok());
+    use super::*;
 
-        let invalid_json = "not valid json";
-        let result = serde_json::from_str::<serde_json::Value>(invalid_json);
-        assert!(result.is_err());
+    #[test]
+    fn test_new_with_text_plaintext() {
+        let column_config = ColumnConfig::build("email".to_string()).casts_as(ColumnType::Utf8Str);
+        let plaintext = "john@example.com".to_string();
+
+        let result = new(plaintext, &column_config);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_new_with_valid_jsonb() {
+        let column_config = ColumnConfig::build("metadata".to_string()).casts_as(ColumnType::JsonB);
+        let plaintext = r#"{"name": "정주영", "age": 85}"#.to_string();
+
+        let result = new(plaintext, &column_config);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_new_with_jsonb_no_validation() {
+        let column_config = ColumnConfig::build("metadata".to_string()).casts_as(ColumnType::JsonB);
+        let invalid_json = "not valid json".to_string();
+
+        // JSONB columns without `ste_vec` indexes don't validate JSON syntax
+        let result = new(invalid_json, &column_config);
+
+        assert!(result.is_ok());
     }
 }
