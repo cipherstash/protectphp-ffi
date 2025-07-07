@@ -102,14 +102,14 @@ Configuration parameters:
 
 **Data Types**
 
-The `cast_as` field determines how plaintext data is processed before encryption:
+The `cast_as` parameter determines how plaintext data is processed before encryption:
 
 | Type | Description | Example Input |
 |------|-------------|---------------|
 | `text` | String data | `john@example.com` |
 | `boolean` | Boolean values | `true` or `false` |
 | `small_int` | 16-bit integer numbers | `32767` |
-| `int` | 32-bit integer numbers | `29` |
+| `int` | 32-bit integer numbers | `2147483647` |
 | `big_int` | 64-bit integer numbers | `9223372036854775807` |
 | `real` | Single-precision floating point | `25.99` |
 | `double` | Double-precision floating point | `3.141592653589793` |
@@ -118,9 +118,9 @@ The `cast_as` field determines how plaintext data is processed before encryption
 
 **Index Types**
 
-The `indexes` field determines what operations are supported on encrypted data:
+The `indexes` parameter determines what operations are supported on encrypted data:
 
-| Index Type | Use Case | Response Field | Plaintext Queries | Search Terms Queries |
+| Index Type | Use Case | Response Parameter | Plaintext Queries | Search Terms Queries |
 |------------|----------|----------------|-------------------|---------------------|
 | `unique` | Exact equality queries and uniqueness constraints | `hm` | `eql_v2.hmac_256()` | `eql_v2.hmac_256()` |
 | `ore` | Equality, range comparisons, range queries, and ordering | `ob` | `eql_v2.ore_block_u64_8_256()` | `eql_v2.ore_block_u64_8_256()` |
@@ -129,7 +129,7 @@ The `indexes` field determines what operations are supported on encrypted data:
 
 **Unique Index (`unique`)**
 
-Enables exact equality queries and database uniqueness constraints. Uses the `hm` response field and works with the `eql_v2.hmac_256()` EQL function. This index generates HMAC-based hashes for exact equality matching.
+Enables exact equality queries and database uniqueness constraints. Uses the `hm` response parameter and works with the `eql_v2.hmac_256()` EQL function. This index generates HMAC-based hashes for exact equality matching.
 
 Basic usage:
 
@@ -185,7 +185,7 @@ WHERE eql_v2.hmac_256(email) = eql_v2.hmac_256(
 );
 ```
 
-For database-level uniqueness constraints, add a unique constraint on the `hm` response field:
+For database-level uniqueness constraints, add a unique constraint on the `hm` response parameter:
 
 ```sql
 CONSTRAINT unique_email UNIQUE ((email->>'hm'))
@@ -193,7 +193,7 @@ CONSTRAINT unique_email UNIQUE ((email->>'hm'))
 
 **Order Revealing Encryption Index (`ore`)**
 
-Enables equality, range operations, and ordering on encrypted data. Uses the `ob` response field and works with the `eql_v2.ore_block_u64_8_256()` EQL function. This index creates order-preserving encrypted values for equality checks, range comparisons, range queries, and sorting operations.
+Enables equality, range operations, and ordering on encrypted data. Uses the `ob` response parameter and works with the `eql_v2.ore_block_u64_8_256()` EQL function. This index creates order-preserving encrypted values for equality checks, range comparisons, range queries, and sorting operations.
 
 Basic usage:
 
@@ -265,7 +265,7 @@ ORDER BY eql_v2.ore_block_u64_8_256(systolic_bp) DESC;
 
 **Match Index (`match`)**
 
-Enables full-text search on encrypted text data using bloom filters. Uses the `bf` response field and works with the `eql_v2.bloom_filter()` EQL function. This index creates bloom filter representations of tokenized text for probabilistic matching.
+Enables full-text search on encrypted text data using bloom filters. Uses the `bf` response parameter and works with the `eql_v2.bloom_filter()` EQL function. This index creates bloom filter representations of tokenized text for probabilistic matching.
 
 Basic usage:
 
@@ -336,7 +336,7 @@ WHERE eql_v2.bloom_filter(medical_notes) @> eql_v2.bloom_filter(
 
 **Structured Text Encryption Vector Index (`ste_vec`)**
 
-Enables containment queries on encrypted JSONB data. Uses the `sv` response field and works with the `cs_ste_vec_v2()` EQL function for plaintext queries and PostgreSQL containment operators (`@>`, `<@`) for search terms queries. This index creates structured text encryption vectors that preserve JSON path relationships for encrypted JSONB containment matching.
+Enables containment queries on encrypted JSONB data. Uses the `sv` response parameter and works with the `cs_ste_vec_v2()` EQL function for plaintext queries and PostgreSQL containment operators (`@>`, `<@`) for search terms queries. This index creates structured text encryption vectors that preserve JSON path relationships for encrypted JSONB containment matching.
 
 Basic usage:
 
@@ -377,7 +377,7 @@ SELECT * FROM patient_records
 WHERE health_assessment <@ '{"sv":[{"s":"df08a4c4157bdb5bf6fa9be89cf18d10...","t":"22303063343133306135646334356130...","r":"mBbL}QHJ&a(@rwS5n)u^G+Fb+Ex8ofB!...","pa":false}],"i":{"t":"patient_records","c":"health_assessment"}}';
 ```
 
-This index differs from other indexes in its query patterns. Plaintext queries use `cs_ste_vec_v2()` with JSON data and only support the PostgreSQL `@>` operator, while search term queries can use both PostgreSQL `@>` and `<@` operators with pre-computed vectors from the `sv` response field in the search terms response.
+This index differs from other indexes in its query patterns. Plaintext queries use `cs_ste_vec_v2()` with JSON data and only support the PostgreSQL `@>` operator, while search term queries can use both PostgreSQL `@>` and `<@` operators with pre-computed vectors from the `sv` response parameter in the search terms response.
 
 ### Creating a Client
 
@@ -460,16 +460,16 @@ $configJson = json_encode($config, JSON_THROW_ON_ERROR);
 $clientPtr = $client->newClient($configJson);
 
 try {
-    $resultJson = $client->encrypt(
+    $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
         tableName: 'patient_records',
     );
 
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
-    $ciphertext = $result['c'];
+    $ciphertext = $encryptResult['c'];
 
     echo $ciphertext;
     // mBbKlk}G7QdaGiNj$dL7#+AOrA^}*VJx...
@@ -585,20 +585,20 @@ $configJson = json_encode($config, JSON_THROW_ON_ERROR);
 $clientPtr = $client->newClient($configJson);
 
 try {
-    $resultJson = $client->encrypt(
+    $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
         tableName: 'patient_records',
     );
 
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
-    $ciphertext = $result['c'];
+    $ciphertext = $encryptResult['c'];
 
-    $plaintext = $client->decrypt($clientPtr, $ciphertext);
+    $decryptResult = $client->decrypt($clientPtr, $ciphertext);
 
-    echo $plaintext;
+    echo $decryptResult;
     // john@example.com
 } finally {
     $client->freeClient($clientPtr);
@@ -611,7 +611,18 @@ Returns the decrypted plaintext as a string.
 
 Provide additional encryption context for an additional layer of security by binding encrypted data to specific contextual information of your choosing. This prevents data encrypted with one context from being decrypted with a different context, even when using the same encryption keys.
 
-Protect.php FFI supports three types of encryption context:
+**Context Types**
+
+The `context` parameter determines what contextual authentication is supported on encrypted data:
+
+| Context Type | Supported Index Types | Description |
+|--------------|----------------------|-------------|
+| `identity_claim` | `unique`, `ore`, `match` | Identity-aware encryption using JWT claims (requires CTS authentication) |
+| `tag` | `unique`, `ore`, `match` | Label-aware encryption using string tags |
+| `value` | `unique`, `ore`, `match` | Attribute-aware encryption using key-value pairs |
+
+> [!IMPORTANT]  
+> Encryption context is not supported with `ste_vec` indexes and will cause decryption to fail.
 
 #### Identity Claim Context
 
@@ -652,7 +663,7 @@ try {
 
     $contextJson = json_encode($context, JSON_THROW_ON_ERROR);
 
-    $resultJson = $client->encrypt(
+    $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
@@ -660,13 +671,13 @@ try {
         contextJson: $contextJson,
     );
 
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
-    $ciphertext = $result['c'];
+    $ciphertext = $encryptResult['c'];
 
-    $plaintext = $client->decrypt($clientPtr, $ciphertext, $contextJson);
+    $decryptResult = $client->decrypt($clientPtr, $ciphertext, $contextJson);
 
-    echo $plaintext;
+    echo $decryptResult;
     // john@example.com
 } finally {
     $client->freeClient($clientPtr);
@@ -709,7 +720,7 @@ try {
 
     $contextJson = json_encode($context, JSON_THROW_ON_ERROR);
 
-    $resultJson = $client->encrypt(
+    $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
@@ -717,13 +728,13 @@ try {
         contextJson: $contextJson,
     );
 
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
-    $ciphertext = $result['c'];
+    $ciphertext = $encryptResult['c'];
 
-    $plaintext = $client->decrypt($clientPtr, $ciphertext, $contextJson);
+    $decryptResult = $client->decrypt($clientPtr, $ciphertext, $contextJson);
 
-    echo $plaintext;
+    echo $decryptResult;
     // john@example.com
 } finally {
     $client->freeClient($clientPtr);
@@ -739,7 +750,7 @@ For improved performance when handling multiple records, use bulk encryption and
 
 #### Bulk Encryption
 
-Encrypt multiple plaintext strings using the `encryptBulk()` method. This method accepts a client pointer and a JSON array of objects, where each object specifies the `plaintext`, `column`, and `table` for encryption:
+Encrypt multiple plaintext strings using the `encryptBulk()` method. This method accepts a client pointer and a JSON array of objects, where each object specifies the `plaintext`, `column`, `table`, and optional `context` for encryption:
 
 ```php
 use CipherStash\Protect\FFI\Client;
@@ -784,12 +795,12 @@ try {
     ];
 
     $itemsJson = json_encode($items, JSON_THROW_ON_ERROR);
-    $resultJson = $client->encryptBulk($clientPtr, $itemsJson);
+    $encryptResultJson = $client->encryptBulk($clientPtr, $itemsJson);
 
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $encryptResults = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
-    foreach ($result as $encryptedData) {
-        $ciphertext = $encryptedData['c'];
+    foreach ($encryptResults as $encryptResult) {
+        $ciphertext = $encryptResult['c'];
 
         echo $ciphertext;
         // mBbKuXT|+vBh~K2WV-!n5_W3DBFd4`Mp...
@@ -803,7 +814,7 @@ Returns a JSON array where each element follows the same structure as documented
 
 #### Bulk Decryption
 
-Decrypt multiple ciphertext strings using the `decryptBulk()` method. This method accepts a client pointer and a JSON array of objects, where each object contains a `ciphertext` key with the base85-encoded ciphertext string:
+Decrypt multiple ciphertext strings using the `decryptBulk()` method. This method accepts a client pointer and a JSON array of objects, where each object contains a `ciphertext` with the base85-encoded ciphertext string and an optional `context` for decryption:
 
 ```php
 use CipherStash\Protect\FFI\Client;
@@ -839,6 +850,9 @@ try {
             'plaintext' => 'john@example.com',
             'column' => 'email',
             'table' => 'patient_records',
+            'context' => [
+                'tag' => ['pii', 'hipaa'],
+            ],
         ],
         [
             'plaintext' => 'Patient shows improvement in mobility and pain management.',
@@ -848,25 +862,30 @@ try {
     ];
 
     $itemsJson = json_encode($items, JSON_THROW_ON_ERROR);
-    $resultJson = $client->encryptBulk($clientPtr, $itemsJson);
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
-    $ciphertexts = array_column($result, 'c');
+    $encryptResultJson = $client->encryptBulk($clientPtr, $itemsJson);
+    $encryptResults = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
-    $ciphertextItems = array_map(function ($ciphertext) {
-        return ['ciphertext' => $ciphertext];
-    }, $ciphertexts);
+    $decryptItems = array_map(function ($item, $encryptResult) {
+        $decryptItem = ['ciphertext' => $encryptResult['c']];
 
-    $ciphertextItemsJson = json_encode($ciphertextItems, JSON_THROW_ON_ERROR);
+        if (isset($item['context'])) {
+            $decryptItem['context'] = $item['context'];
+        }
 
-    echo $ciphertextItemsJson;
-    // [{"ciphertext":"mBbK>BcAYctW$Gy)vK2)Y$&nBBKz{oL1..."},{"ciphertext":"mBbJ<8tOEI+Z`KFUV`q&kmdWtO#DKxW|..."}]
+        return $decryptItem;
+    }, $items, $encryptResults);
 
-    $decryptedResultJson = $client->decryptBulk($clientPtr, $ciphertextItemsJson);
+    $decryptItemsJson = json_encode($decryptItems, JSON_THROW_ON_ERROR);
 
-    echo $decryptedResultJson;
+    echo $decryptItemsJson;
+    // [{"ciphertext":"mBbK>BcAYctW$Gy)vK2)Y$&nBBKz{oL1...","context":{"tag":["pii","hipaa"]}},{"ciphertext":"mBbJ<8tOEI+Z`KFUV`q&kmdWtO#DKxW|..."}]
+
+    $decryptResultJson = $client->decryptBulk($clientPtr, $decryptItemsJson);
+
+    echo $decryptResultJson;
     // ["john@example.com","Patient shows improvement in mobility and pain management."]
 
-    $plaintexts = json_decode(json: $decryptedResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $decryptResults = json_decode(json: $decryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 } finally {
     $client->freeClient($clientPtr);
 }
@@ -876,7 +895,7 @@ Returns a JSON array of decrypted plaintext strings in the same order as the inp
 
 ### Searchable Encryption
 
-Create search terms that enable querying encrypted data without decryption using the `createSearchTerms()` method. This method accepts a client pointer and a JSON array of objects, where each object specifies the `plaintext`, `column`, and `table` for generating search terms:
+Create search terms that enable querying encrypted data without decryption using the `createSearchTerms()` method. This method accepts a client pointer and a JSON array of objects, where each object specifies the `plaintext`, `column`, `table`, and optional `context` for generating search terms:
 
 ```php
 use CipherStash\Protect\FFI\Client;
@@ -907,11 +926,14 @@ $configJson = json_encode($config, JSON_THROW_ON_ERROR);
 $clientPtr = $client->newClient($configJson);
 
 try {
-    $terms = [
+    $searchTerms = [
         [
             'plaintext' => 'john@example.com',
             'column' => 'email',
             'table' => 'patient_records',
+            'context' => [
+                'tag' => ['pii', 'hipaa'],
+            ],
         ],
         [
             'plaintext' => '120',
@@ -920,11 +942,11 @@ try {
         ],
     ];
 
-    $termsJson = json_encode($terms, JSON_THROW_ON_ERROR);
-    $resultJson = $client->createSearchTerms($clientPtr, $termsJson);
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $searchTermsJson = json_encode($searchTerms, JSON_THROW_ON_ERROR);
+    $searchTermsResultJson = $client->createSearchTerms($clientPtr, $searchTermsJson);
+    $searchTermsResult = json_decode(json: $searchTermsResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
-    foreach ($result as $searchTerms) {
+    foreach ($searchTermsResult as $searchTerms) {
         echo json_encode($searchTerms);
         // {"hm":"f3ca71fd39ae9d3d1d1fc25141bcb6da...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"}}
     }
@@ -1034,15 +1056,15 @@ try {
     $configJson = json_encode($config, JSON_THROW_ON_ERROR);
     $clientPtr = $client->newClient($configJson);
 
-    $resultJson = $client->encrypt(
+    $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
         tableName: 'patient_records',
     );
 
-    $result = json_decode(json: $resultJson, associative: true, flags: JSON_THROW_ON_ERROR);
-    $ciphertext = $result['c'];
+    $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+    $ciphertext = $encryptResult['c'];
 
     echo $ciphertext;
     // mBbKlk}G7QdaGiNj$dL7#+AOrA^}*VJx...
