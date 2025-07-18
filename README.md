@@ -1,6 +1,6 @@
 # Protect.php FFI
 
-Protect.php FFI provides PHP bindings for the [CipherStash Client SDK](https://crates.io/crates/cipherstash-client) via PHP's [Foreign Function Interface (FFI)](https://www.php.net/manual/en/book.ffi.php). 
+Protect.php FFI provides PHP bindings for the [CipherStash Client SDK](https://crates.io/crates/cipherstash-client) via PHP's [Foreign Function Interface (FFI)](https://www.php.net/manual/en/book.ffi.php).
 
 Field-level encryption operations happen directly in your application with a unique key for each encrypted value, managed by CipherStash [ZeroKMS](https://cipherstash.com/products/zerokms) and backed by [AWS KMS](https://docs.aws.amazon.com/kms/latest/developerguide/overview.html). The encrypted data can be stored in any database that supports JSONB.
 
@@ -120,16 +120,16 @@ The `cast_as` parameter determines how plaintext data is processed before encryp
 
 The `indexes` parameter determines what operations are supported on encrypted data:
 
-| Index Type | Use Case | Response Parameter | Plaintext Queries | Search Terms Queries |
-|------------|----------|----------------|-------------------|---------------------|
-| `unique` | Exact equality queries and uniqueness constraints | `hm` | `eql_v2.hmac_256()` | `eql_v2.hmac_256()` |
-| `ore` | Equality, range comparisons, range queries, and ordering | `ob` | `eql_v2.ore_block_u64_8_256()` | `eql_v2.ore_block_u64_8_256()` |
-| `match` | Full-text search queries | `bf` | `eql_v2.bloom_filter()` | `eql_v2.bloom_filter()` |
-| `ste_vec` | JSONB containment queries | `sv` | `cs_ste_vec_v2()` | `@>`, `<@` |
+| Index Type | Description | Response Parameter | Supported Queries |
+|------------|-------------|-------------------|------------------|
+| `unique` | Exact equality queries and uniqueness constraints | `hm` | `=` |
+| `ore` | Equality, range comparisons, range queries, and ordering | `ob` | `=`, `>`, `<`, `BETWEEN`, `ORDER BY` |
+| `match` | Full-text search queries | `bf` | `~~` |
+| `ste_vec` | JSONB containment queries | `sv` | `@>`, `<@` |
 
 **Unique Index (`unique`)**
 
-Enables exact equality queries and database uniqueness constraints. Uses the `hm` response parameter and works with the `eql_v2.hmac_256()` EQL function. This index generates HMAC-based hashes for exact equality matching.
+Enables exact equality queries and database uniqueness constraints. Uses the `hm` response parameter to generate HMAC-based hashes for exact equality matching.
 
 Basic usage:
 
@@ -168,21 +168,13 @@ With custom parameters:
 ],
 ```
 
-Example SQL queries:
+Example SQL query:
 
 ```sql
 -- Find patient record by email address
--- Using plaintext (encrypted in real-time, plaintext loggable):
-SELECT * FROM patient_records 
-WHERE eql_v2.hmac_256(email) = eql_v2.hmac_256(
-  '{"k":"pt","p":"john@example.com","q":"hmac_256","i":{"t":"patient_records","c":"email"},"v":2}'
-);
-
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
-SELECT * FROM patient_records 
-WHERE eql_v2.hmac_256(email) = eql_v2.hmac_256(
-  '{"hm":"0f4f3b99671e74c0f8b5a1d2e3f4a5b6c7d8...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"}}'
-);
+SELECT * FROM patient_records
+WHERE email = '{"hm":"0f4f3b99671e74c0f8b5a1d2e3f4a5b6c7d8...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"}}'::jsonb;
 ```
 
 For database-level uniqueness constraints, add a unique constraint on the `hm` response parameter:
@@ -193,7 +185,7 @@ CONSTRAINT unique_email UNIQUE ((email->>'hm'))
 
 **Order Revealing Encryption Index (`ore`)**
 
-Enables equality, range operations, and ordering on encrypted data. Uses the `ob` response parameter and works with the `eql_v2.ore_block_u64_8_256()` EQL function. This index creates order-preserving encrypted values for equality checks, range comparisons, range queries, and sorting operations.
+Enables equality, range operations, and ordering on encrypted data. Uses the `ob` response parameter to create order-preserving encrypted values for equality checks, range comparisons, and sorting operations.
 
 Basic usage:
 
@@ -216,56 +208,34 @@ Example SQL queries:
 
 ```sql
 -- Find patients with exact blood pressure value
--- Using plaintext (encrypted in real-time, plaintext loggable):
-SELECT * FROM patient_records 
-WHERE eql_v2.ore_block_u64_8_256(systolic_bp) = eql_v2.ore_block_u64_8_256(
-  '{"k":"pt","p":"120","q":"ore","i":{"t":"patient_records","c":"systolic_bp"},"v":2}'
-);
-
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
-SELECT * FROM patient_records 
-WHERE eql_v2.ore_block_u64_8_256(systolic_bp) = eql_v2.ore_block_u64_8_256(
-  '{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'
-);
+SELECT * FROM patient_records
+WHERE systolic_bp = '{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'::jsonb;
 
 -- Find patients with blood pressure above specified threshold
--- Using plaintext (encrypted in real-time, plaintext loggable):
-SELECT * FROM patient_records 
-WHERE eql_v2.ore_block_u64_8_256(systolic_bp) >= eql_v2.ore_block_u64_8_256(
-  '{"k":"pt","p":"140","q":"ore","i":{"t":"patient_records","c":"systolic_bp"},"v":2}'
-);
-
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
-SELECT * FROM patient_records 
-WHERE eql_v2.ore_block_u64_8_256(systolic_bp) >= eql_v2.ore_block_u64_8_256(
-  '{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'
-);
+SELECT * FROM patient_records
+WHERE systolic_bp >= '{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'::jsonb;
 
 -- Find patients with blood pressure in specified range
--- Using plaintext (encrypted in real-time, plaintext loggable):
-SELECT * FROM patient_records 
-WHERE eql_v2.ore_block_u64_8_256(systolic_bp) BETWEEN 
-      eql_v2.ore_block_u64_8_256('{"k":"pt","p":"90","q":"ore","i":{"t":"patient_records","c":"systolic_bp"},"v":2}') 
-  AND eql_v2.ore_block_u64_8_256('{"k":"pt","p":"120","q":"ore","i":{"t":"patient_records","c":"systolic_bp"},"v":2}');
-
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
-SELECT * FROM patient_records 
-WHERE eql_v2.ore_block_u64_8_256(systolic_bp) BETWEEN 
-      eql_v2.ore_block_u64_8_256('{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}') 
-  AND eql_v2.ore_block_u64_8_256('{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}');
+SELECT * FROM patient_records
+WHERE systolic_bp BETWEEN
+      '{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'::jsonb
+  AND '{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'::jsonb;
 
 -- Order patients by blood pressure from lowest to highest
-SELECT * FROM patient_records 
-ORDER BY eql_v2.ore_block_u64_8_256(systolic_bp) ASC;
+SELECT * FROM patient_records
+ORDER BY systolic_bp ASC;
 
 -- Order patients by blood pressure from highest to lowest
-SELECT * FROM patient_records 
-ORDER BY eql_v2.ore_block_u64_8_256(systolic_bp) DESC;
+SELECT * FROM patient_records
+ORDER BY systolic_bp DESC;
 ```
 
 **Match Index (`match`)**
 
-Enables full-text search on encrypted text data using bloom filters. Uses the `bf` response parameter and works with the `eql_v2.bloom_filter()` EQL function. This index creates bloom filter representations of tokenized text for probabilistic matching.
+Enables full-text search on encrypted text data using bloom filters. Uses the `bf` response parameter to create bloom filter representations of tokenized text for probabilistic matching.
 
 Basic usage:
 
@@ -317,26 +287,18 @@ With custom parameters:
 ],
 ```
 
-Example SQL queries:
+Example SQL query:
 
 ```sql
 -- Find patients with medical notes containing specified terms
--- Using plaintext (encrypted in real-time, plaintext loggable):
-SELECT * FROM patient_records 
-WHERE eql_v2.bloom_filter(medical_notes) @> eql_v2.bloom_filter(
-  '{"k":"pt","p":"diabetes","q":"match","i":{"t":"patient_records","c":"medical_notes"},"v":2}'
-);
-
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
-SELECT * FROM patient_records 
-WHERE eql_v2.bloom_filter(medical_notes) @> eql_v2.bloom_filter(
-  '{"hm":null,"ob":null,"bf":[1397,378,1463,1673,1474,1226],"i":{"t":"patient_records","c":"medical_notes"}}'
-);
+SELECT * FROM patient_records
+WHERE medical_notes ~~ '{"hm":null,"ob":null,"bf":[1397,378,1463,1673,1474,1226],"i":{"t":"patient_records","c":"medical_notes"}}'::jsonb;
 ```
 
 **Structured Text Encryption Vector Index (`ste_vec`)**
 
-Enables containment queries on encrypted JSONB data. Uses the `sv` response parameter and works with the `cs_ste_vec_v2()` EQL function for plaintext queries and PostgreSQL containment operators (`@>`, `<@`) for search terms queries. This index creates structured text encryption vectors that preserve JSON path relationships for encrypted JSONB containment matching.
+Enables containment queries on encrypted JSONB data. Uses the `sv` response parameter to create structured text encryption vectors that preserve JSON path relationships for encrypted JSONB containment matching.
 
 Basic usage:
 
@@ -363,21 +325,15 @@ Example SQL queries:
 
 ```sql
 -- Find records where encrypted data contains specified values
--- Using plaintext (encrypted in real-time, plaintext loggable):
-SELECT * FROM patient_records 
-WHERE cs_ste_vec_v2(health_assessment, '{"conditions":["diabetes","hypertension"],"severity":"moderate","lab_results":{"cholesterol":{"total":180,"hdl":45},"glucose":95},"visit_date":"2025-02-04"}');
-
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
-SELECT * FROM patient_records 
-WHERE health_assessment @> '{"sv":[{"s":"dd4659b9c279af040dd05ce21b2a22f7...","t":"22303061363334333330316661653633...","r":"mBbL}QHJ&a(@rwS5n)u^G+Fb+t}Soo-h...","pa":false}],"i":{"t":"patient_records","c":"health_assessment"}}';
+SELECT * FROM patient_records
+WHERE health_assessment @> '{"sv":[{"s":"dd4659b9c279af040dd05ce21b2a22f7...","t":"22303061363334333330316661653633...","r":"mBbL}QHJ&a(@rwS5n)u^G+Fb+t}Soo-h...","pa":false}],"i":{"t":"patient_records","c":"health_assessment"}}'::jsonb;
 
 -- Find records where encrypted data is contained by specified values
 -- Using search terms (encrypted ahead of time, plaintext not loggable):
-SELECT * FROM patient_records 
-WHERE health_assessment <@ '{"sv":[{"s":"df08a4c4157bdb5bf6fa9be89cf18d10...","t":"22303063343133306135646334356130...","r":"mBbL}QHJ&a(@rwS5n)u^G+Fb+Ex8ofB!...","pa":false}],"i":{"t":"patient_records","c":"health_assessment"}}';
+SELECT * FROM patient_records
+WHERE health_assessment <@ '{"sv":[{"s":"df08a4c4157bdb5bf6fa9be89cf18d10...","t":"22303063343133306135646334356130...","r":"mBbL}QHJ&a(@rwS5n)u^G+Fb+Ex8ofB!...","pa":false}],"i":{"t":"patient_records","c":"health_assessment"}}'::jsonb;
 ```
-
-This index differs from other indexes in its query patterns. Plaintext queries use `cs_ste_vec_v2()` with JSON data and only support the PostgreSQL `@>` operator, while search term queries can use both PostgreSQL `@>` and `<@` operators with pre-computed vectors from the `sv` response parameter in the search terms response.
 
 ### Creating a Client
 
@@ -621,7 +577,7 @@ The `context` parameter determines what contextual authentication is supported o
 | `tag` | `unique`, `ore`, `match` | Label-aware encryption using string tags |
 | `value` | `unique`, `ore`, `match` | Attribute-aware encryption using key-value pairs |
 
-> [!IMPORTANT]  
+> [!IMPORTANT]
 > Encryption context is not supported with `ste_vec` indexes and will cause decryption to fail.
 
 #### Identity Claim Context
@@ -959,7 +915,7 @@ This functionality integrates with [EQL](https://github.com/cipherstash/encrypt-
 
 #### Search Terms Response
 
-The `createSearchTerms()` method returns a JSON string containing search terms with only the searchable indexes (without the full ciphertext). The response format depends on the configured indexes.
+The `createSearchTerms()` method returns a JSON string containing search terms with only the encryption indexes (without the full ciphertext). The response format depends on the configured indexes.
 
 **Standard Indexes Response**
 
