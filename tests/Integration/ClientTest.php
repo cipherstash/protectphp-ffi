@@ -101,22 +101,22 @@ class ClientTest extends TestCase
             $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
             $this->assertIsArray($encryptResult);
             $this->assertArrayHasKey('k', $encryptResult);
-            $this->assertEquals('ct', $encryptResult['k']);
+            $this->assertSame('ct', $encryptResult['k']);
             $this->assertArrayHasKey('c', $encryptResult);
             $ciphertext = $encryptResult['c'];
             $this->assertIsString($ciphertext);
             $this->assertNotEmpty($ciphertext);
             $this->assertNotEquals($plaintext, $ciphertext);
             $this->assertArrayHasKey('dt', $encryptResult);
-            $this->assertEquals('text', $encryptResult['dt']);
+            $this->assertSame('text', $encryptResult['dt']);
             $this->assertArrayHasKey('i', $encryptResult);
             $identifier = $encryptResult['i'];
             $this->assertIsArray($identifier);
-            $this->assertEquals('users', $identifier['t']);
-            $this->assertEquals('email', $identifier['c']);
+            $this->assertSame('users', $identifier['t']);
+            $this->assertSame('email', $identifier['c']);
 
             $decryptResult = $client->decrypt($clientPtr, $ciphertext);
-            $this->assertEquals($plaintext, $decryptResult);
+            $this->assertSame($plaintext, $decryptResult);
         } finally {
             $client->freeClient($clientPtr);
         }
@@ -242,22 +242,22 @@ class ClientTest extends TestCase
             $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
             $this->assertIsArray($encryptResult);
             $this->assertArrayHasKey('k', $encryptResult);
-            $this->assertEquals('sv', $encryptResult['k']);
+            $this->assertSame('sv', $encryptResult['k']);
             $this->assertArrayHasKey('c', $encryptResult);
             $ciphertext = $encryptResult['c'];
             $this->assertIsString($ciphertext);
             $this->assertNotEmpty($ciphertext);
             $this->assertNotEquals($complexJson, $ciphertext);
             $this->assertArrayHasKey('dt', $encryptResult);
-            $this->assertEquals('jsonb', $encryptResult['dt']);
+            $this->assertSame('jsonb', $encryptResult['dt']);
             $this->assertArrayHasKey('sv', $encryptResult);
             $this->assertIsArray($encryptResult['sv']);
             $this->assertNotEmpty($encryptResult['sv']);
             $this->assertArrayHasKey('i', $encryptResult);
             $identifier = $encryptResult['i'];
             $this->assertIsArray($identifier);
-            $this->assertEquals('users', $identifier['t']);
-            $this->assertEquals('metadata', $identifier['c']);
+            $this->assertSame('users', $identifier['t']);
+            $this->assertSame('metadata', $identifier['c']);
 
             $decryptResultJson = $client->decrypt($clientPtr, $ciphertext);
 
@@ -276,16 +276,16 @@ class ClientTest extends TestCase
             $systemMetadata = $decryptResult['system_metadata'];
             $this->assertIsArray($systemMetadata);
 
-            $this->assertEquals('CUST-20240315-7892', $userProfile['customer_id']);
-            $this->assertEquals('premium', $userProfile['membership_tier']);
-            $this->assertEquals('2024-03-15T09:30:00Z', $userProfile['registration_date']);
-            $this->assertEquals('2024-06-15T14:22:33Z', $userProfile['last_login']);
+            $this->assertSame('CUST-20240315-7892', $userProfile['customer_id']);
+            $this->assertSame('premium', $userProfile['membership_tier']);
+            $this->assertSame('2024-03-15T09:30:00Z', $userProfile['registration_date']);
+            $this->assertSame('2024-06-15T14:22:33Z', $userProfile['last_login']);
 
             $preferences = $userProfile['preferences'];
             $this->assertIsArray($preferences);
-            $this->assertEquals('en-US', $preferences['language']);
-            $this->assertEquals('America/New_York', $preferences['timezone']);
-            $this->assertEquals('dark', $preferences['theme']);
+            $this->assertSame('en-US', $preferences['language']);
+            $this->assertSame('America/New_York', $preferences['timezone']);
+            $this->assertSame('dark', $preferences['theme']);
 
             $notifications = $preferences['notifications'];
             $this->assertIsArray($notifications);
@@ -304,46 +304,46 @@ class ClientTest extends TestCase
             $taxInfo = $billingInfo['tax_info'];
             $this->assertIsArray($taxInfo);
 
-            $this->assertEquals('credit_card', $creditCard['type']);
-            $this->assertEquals('4532', $creditCard['last_four']);
-            $this->assertEquals('visa', $creditCard['brand']);
-            $this->assertEquals(12, $creditCard['exp_month']);
-            $this->assertEquals(2027, $creditCard['exp_year']);
-            $this->assertEquals('bank_account', $bankAccount['type']);
-            $this->assertEquals('checking', $bankAccount['account_type']);
-            $this->assertEquals('Example Community Bank', $bankAccount['bank_name']);
-            $this->assertEquals('0021', $bankAccount['routing_last_four']);
-            $this->assertEquals('742 Evergreen Terrace', $billingAddress['street']);
-            $this->assertEquals('Springfield', $billingAddress['city']);
-            $this->assertEquals('OR', $billingAddress['state']);
-            $this->assertEquals('97477', $billingAddress['postal_code']);
-            $this->assertEquals('US', $billingAddress['country']);
-            $this->assertEquals('TIN-456-78-9012', $taxInfo['tax_id']);
+            $this->assertSame('credit_card', $creditCard['type']);
+            $this->assertSame('4532', $creditCard['last_four']);
+            $this->assertSame('visa', $creditCard['brand']);
+            $this->assertSame(12, $creditCard['exp_month']);
+            $this->assertSame(2027, $creditCard['exp_year']);
+            $this->assertSame('bank_account', $bankAccount['type']);
+            $this->assertSame('checking', $bankAccount['account_type']);
+            $this->assertSame('Example Community Bank', $bankAccount['bank_name']);
+            $this->assertSame('0021', $bankAccount['routing_last_four']);
+            $this->assertSame('742 Evergreen Terrace', $billingAddress['street']);
+            $this->assertSame('Springfield', $billingAddress['city']);
+            $this->assertSame('OR', $billingAddress['state']);
+            $this->assertSame('97477', $billingAddress['postal_code']);
+            $this->assertSame('US', $billingAddress['country']);
+            $this->assertSame('TIN-456-78-9012', $taxInfo['tax_id']);
             $this->assertFalse($taxInfo['tax_exempt']);
-            $this->assertEquals('individual', $taxInfo['business_type']);
+            $this->assertSame('individual', $taxInfo['business_type']);
 
-            $this->assertEquals(247, $activityData['session_count']);
-            $this->assertEquals(18, $activityData['total_purchases']);
-            $this->assertEquals(2847.63, $activityData['lifetime_value']);
-            $this->assertEquals(420, $activityData['avg_session_duration']);
+            $this->assertSame(247, $activityData['session_count']);
+            $this->assertSame(18, $activityData['total_purchases']);
+            $this->assertSame(2847.63, $activityData['lifetime_value']);
+            $this->assertSame(420, $activityData['avg_session_duration']);
             $this->assertEquals(['electronics', 'books', 'home-garden'], $activityData['favorite_categories']);
 
             $recentSearches = $activityData['recent_searches'];
             $this->assertIsArray($recentSearches);
-            $this->assertEquals('wireless headphones', $recentSearches[0]);
-            $this->assertEquals('ergonomic office chair', $recentSearches[1]);
-            $this->assertEquals('smart home devices', $recentSearches[2]);
+            $this->assertSame('wireless headphones', $recentSearches[0]);
+            $this->assertSame('ergonomic office chair', $recentSearches[1]);
+            $this->assertSame('smart home devices', $recentSearches[2]);
 
             $deviceInfo = $activityData['device_info'];
             $this->assertIsArray($deviceInfo);
-            $this->assertEquals('desktop', $deviceInfo['primary_device']);
-            $this->assertEquals('macOS 14.5', $deviceInfo['os']);
-            $this->assertEquals('Safari 17.4', $deviceInfo['browser']);
-            $this->assertEquals('2560x1440', $deviceInfo['screen_resolution']);
+            $this->assertSame('desktop', $deviceInfo['primary_device']);
+            $this->assertSame('macOS 14.5', $deviceInfo['os']);
+            $this->assertSame('Safari 17.4', $deviceInfo['browser']);
+            $this->assertSame('2560x1440', $deviceInfo['screen_resolution']);
 
-            $this->assertEquals('1.2.4', $systemMetadata['record_version']);
-            $this->assertEquals('confidential', $systemMetadata['data_classification']);
-            $this->assertEquals('delete_after_7_years', $systemMetadata['retention_policy']);
+            $this->assertSame('1.2.4', $systemMetadata['record_version']);
+            $this->assertSame('confidential', $systemMetadata['data_classification']);
+            $this->assertSame('delete_after_7_years', $systemMetadata['retention_policy']);
 
             $complianceFlags = $systemMetadata['compliance_flags'];
             $this->assertIsArray($complianceFlags);
@@ -353,24 +353,24 @@ class ClientTest extends TestCase
 
             $auditInfo = $systemMetadata['audit_info'];
             $this->assertIsArray($auditInfo);
-            $this->assertEquals('registration_system', $auditInfo['created_by']);
-            $this->assertEquals('2024-03-15T09:30:00Z', $auditInfo['created_at']);
-            $this->assertEquals('profile_update_service', $auditInfo['last_modified_by']);
-            $this->assertEquals('2024-06-10T16:45:22Z', $auditInfo['last_modified_at']);
-            $this->assertEquals(14, $auditInfo['modification_count']);
+            $this->assertSame('registration_system', $auditInfo['created_by']);
+            $this->assertSame('2024-03-15T09:30:00Z', $auditInfo['created_at']);
+            $this->assertSame('profile_update_service', $auditInfo['last_modified_by']);
+            $this->assertSame('2024-06-10T16:45:22Z', $auditInfo['last_modified_at']);
+            $this->assertSame(14, $auditInfo['modification_count']);
 
             $integrationData = $systemMetadata['integration_data'];
             $this->assertIsArray($integrationData);
-            $this->assertEquals('ext_usr_7bf4c8d9e12a', $integrationData['external_id']);
-            $this->assertEquals('synchronized', $integrationData['sync_status']);
-            $this->assertEquals('2024-06-15T08:00:00Z', $integrationData['last_sync']);
+            $this->assertSame('ext_usr_7bf4c8d9e12a', $integrationData['external_id']);
+            $this->assertSame('synchronized', $integrationData['sync_status']);
+            $this->assertSame('2024-06-15T08:00:00Z', $integrationData['last_sync']);
 
             $testFields = $systemMetadata['test_fields'];
             $this->assertIsArray($testFields);
-            $this->assertEquals('!@#$%^&*()_+-=[]{}|;:,.<>?', $testFields['special_chars']);
-            $this->assertEquals('User speaks: English, Français, Español, 中文, العربية, Русский 🌐', $testFields['unicode_text']);
+            $this->assertSame('!@#$%^&*()_+-=[]{}|;:,.<>?', $testFields['special_chars']);
+            $this->assertSame('User speaks: English, Français, Español, 中文, العربية, Русский 🌐', $testFields['unicode_text']);
             $this->assertNull($testFields['null_value']);
-            $this->assertEquals('', $testFields['empty_string']);
+            $this->assertSame('', $testFields['empty_string']);
             $this->assertEquals([], $testFields['empty_array']);
             $this->assertEquals([], $testFields['empty_object']);
 
@@ -382,12 +382,12 @@ class ClientTest extends TestCase
 
             $numericValues = $testFields['numeric_values'];
             $this->assertIsArray($numericValues);
-            $this->assertEquals(95.7, $numericValues['score']);
-            $this->assertEquals(1247, $numericValues['rank']);
-            $this->assertEquals(0.863, $numericValues['percentage']);
-            $this->assertEquals(-42, $numericValues['negative_value']);
-            $this->assertEquals(0, $numericValues['zero_value']);
-            $this->assertEquals(1.23e-4, $numericValues['scientific_notation']);
+            $this->assertSame(95.7, $numericValues['score']);
+            $this->assertSame(1247, $numericValues['rank']);
+            $this->assertSame(0.863, $numericValues['percentage']);
+            $this->assertSame(-42, $numericValues['negative_value']);
+            $this->assertSame(0, $numericValues['zero_value']);
+            $this->assertSame(1.23e-4, $numericValues['scientific_notation']);
         } finally {
             $client->freeClient($clientPtr);
         }
@@ -421,10 +421,10 @@ class ClientTest extends TestCase
             $this->assertNotEmpty($ciphertext);
             $this->assertNotEquals($plaintext, $ciphertext);
             $this->assertArrayHasKey('dt', $encryptResult);
-            $this->assertEquals('text', $encryptResult['dt']);
+            $this->assertSame('text', $encryptResult['dt']);
 
             $decryptResult = $client->decrypt($clientPtr, $ciphertext, $contextJson);
-            $this->assertEquals($plaintext, $decryptResult);
+            $this->assertSame($plaintext, $decryptResult);
         } finally {
             $client->freeClient($clientPtr);
         }
@@ -616,57 +616,57 @@ class ClientTest extends TestCase
             $emailResult = $encryptResults[0];
             $this->assertIsArray($emailResult);
             $this->assertArrayHasKey('k', $emailResult);
-            $this->assertEquals('ct', $emailResult['k']);
+            $this->assertSame('ct', $emailResult['k']);
             $this->assertArrayHasKey('c', $emailResult);
             $this->assertIsString($emailResult['c']);
             $this->assertNotEmpty($emailResult['c']);
             $this->assertArrayHasKey('dt', $emailResult);
-            $this->assertEquals('text', $emailResult['dt']);
+            $this->assertSame('text', $emailResult['dt']);
             $this->assertArrayHasKey('i', $emailResult);
             $emailIdentifier = $emailResult['i'];
             $this->assertIsArray($emailIdentifier);
-            $this->assertEquals('users', $emailIdentifier['t']);
-            $this->assertEquals('email', $emailIdentifier['c']);
+            $this->assertSame('users', $emailIdentifier['t']);
+            $this->assertSame('email', $emailIdentifier['c']);
 
             $ageResult = $encryptResults[1];
             $this->assertIsArray($ageResult);
             $this->assertArrayHasKey('k', $ageResult);
-            $this->assertEquals('ct', $ageResult['k']);
+            $this->assertSame('ct', $ageResult['k']);
             $this->assertArrayHasKey('c', $ageResult);
             $this->assertIsString($ageResult['c']);
             $this->assertNotEmpty($ageResult['c']);
             $this->assertArrayHasKey('dt', $ageResult);
-            $this->assertEquals('int', $ageResult['dt']);
+            $this->assertSame('int', $ageResult['dt']);
             $this->assertArrayHasKey('i', $ageResult);
             $ageIdentifier = $ageResult['i'];
             $this->assertIsArray($ageIdentifier);
-            $this->assertEquals('users', $ageIdentifier['t']);
-            $this->assertEquals('age', $ageIdentifier['c']);
+            $this->assertSame('users', $ageIdentifier['t']);
+            $this->assertSame('age', $ageIdentifier['c']);
 
             $jobTitleResult = $encryptResults[2];
             $this->assertIsArray($jobTitleResult);
             $this->assertArrayHasKey('k', $jobTitleResult);
-            $this->assertEquals('ct', $jobTitleResult['k']);
+            $this->assertSame('ct', $jobTitleResult['k']);
             $this->assertArrayHasKey('c', $jobTitleResult);
             $this->assertIsString($jobTitleResult['c']);
             $this->assertNotEmpty($jobTitleResult['c']);
             $this->assertArrayHasKey('dt', $jobTitleResult);
-            $this->assertEquals('text', $jobTitleResult['dt']);
+            $this->assertSame('text', $jobTitleResult['dt']);
             $this->assertArrayHasKey('i', $jobTitleResult);
             $jobTitleIdentifier = $jobTitleResult['i'];
             $this->assertIsArray($jobTitleIdentifier);
-            $this->assertEquals('users', $jobTitleIdentifier['t']);
-            $this->assertEquals('job_title', $jobTitleIdentifier['c']);
+            $this->assertSame('users', $jobTitleIdentifier['t']);
+            $this->assertSame('job_title', $jobTitleIdentifier['c']);
 
             $metadataResult = $encryptResults[3];
             $this->assertIsArray($metadataResult);
             $this->assertArrayHasKey('k', $metadataResult);
-            $this->assertEquals('sv', $metadataResult['k']);
+            $this->assertSame('sv', $metadataResult['k']);
             $this->assertArrayHasKey('c', $metadataResult);
             $this->assertIsString($metadataResult['c']);
             $this->assertNotEmpty($metadataResult['c']);
             $this->assertArrayHasKey('dt', $metadataResult);
-            $this->assertEquals('jsonb', $metadataResult['dt']);
+            $this->assertSame('jsonb', $metadataResult['dt']);
             $this->assertArrayHasKey('sv', $metadataResult);
             $this->assertIsArray($metadataResult['sv']);
             $this->assertNotEmpty($metadataResult['sv']);
@@ -689,8 +689,8 @@ class ClientTest extends TestCase
             $this->assertArrayHasKey('i', $metadataResult);
             $metadataIdentifier = $metadataResult['i'];
             $this->assertIsArray($metadataIdentifier);
-            $this->assertEquals('users', $metadataIdentifier['t']);
-            $this->assertEquals('metadata', $metadataIdentifier['c']);
+            $this->assertSame('users', $metadataIdentifier['t']);
+            $this->assertSame('metadata', $metadataIdentifier['c']);
 
             $ciphertexts = array_column($encryptResults, 'c');
             $this->assertCount(4, $ciphertexts);
@@ -761,7 +761,7 @@ class ClientTest extends TestCase
             $this->assertCount(4, $encryptResults);
 
             $decryptItems = array_map(function ($item, $encryptResult) {
-                assert(is_array($encryptResult));
+                $this->assertIsArray($encryptResult);
 
                 $ciphertext = $encryptResult['c'];
                 $this->assertIsString($ciphertext);
@@ -887,7 +887,7 @@ class ClientTest extends TestCase
                 $this->assertIsArray($searchTerms);
                 $identifier = $searchTerms['i'];
                 $this->assertIsArray($identifier);
-                $this->assertEquals('users', $identifier['t']);
+                $this->assertSame('users', $identifier['t']);
                 $this->assertContains($identifier['c'], ['email', 'age', 'job_title', 'metadata']);
             }
         } finally {
@@ -926,8 +926,8 @@ class ClientTest extends TestCase
 
             $identifier = $searchTerm['i'];
             $this->assertIsArray($identifier);
-            $this->assertEquals('users', $identifier['t']);
-            $this->assertEquals('email', $identifier['c']);
+            $this->assertSame('users', $identifier['t']);
+            $this->assertSame('email', $identifier['c']);
         } finally {
             $client->freeClient($clientPtr);
         }
