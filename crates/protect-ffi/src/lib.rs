@@ -108,7 +108,7 @@ pub enum Encrypted {
         data_type: String,
         /// Structured text encryption vector for JSONB containment queries.
         #[serde(rename = "sv")]
-        ste_vec_index: Vec<SteVecEntry>,
+        ste_vec_index: Option<Vec<SteVecEntry>>,
         /// Table and column identifier for this encrypted value.
         #[serde(rename = "i")]
         identifier: Identifier,
@@ -438,97 +438,113 @@ fn to_eql_encrypted(
     identifier: &Identifier,
     cast_as: &CastAs,
 ) -> Result<Encrypted, Error> {
-    match encrypted {
-        encryption::Encrypted::Record(ciphertext, terms) => {
-            // Collect encryption indexes from encryption terms
-            struct Indexes {
-                unique_index: Option<String>,
-                ore_index: Option<Vec<String>>,
-                match_index: Option<Vec<u16>>,
-            }
+    match (cast_as, encrypted) {
+        // JSONB always uses SteVec format
+        (CastAs::JsonB, encrypted) => {
+            let (ciphertext, ste_vec_index) = match encrypted {
+                encryption::Encrypted::SteVec(ste_vec_index) => {
+                    let root_ciphertext = ste_vec_index.root_ciphertext().map_err(|e| {
+                        Error::InvariantViolation(format!("failed to get root ciphertext: {}", e))
+                    })?;
 
-            let mut indexes = Indexes {
-                unique_index: None,
-                ore_index: None,
-                match_index: None,
+                    let ciphertext = root_ciphertext
+                        .to_mp_base85()
+                        // The error type from `to_mp_base85` isn't public, so we don't derive an error for this one.
+                        // Instead, we use `map_err`.
+                        .map_err(|err| Error::Base85(err.to_string()))?;
+
+                    let ste_vec_entries: Result<Vec<SteVecEntry>, Error> = ste_vec_index
+                        .into_iter()
+                        .map(|entry| {
+                            let record = entry
+                                .record
+                                .to_mp_base85()
+                                // The error type from `to_mp_base85` isn't public, so we don't derive an error for this one.
+                                // Instead, we use `map_err`.
+                                .map_err(|err| Error::Base85(err.to_string()))?;
+
+                            Ok(SteVecEntry {
+                                tokenized_selector: hex::encode(
+                                    entry.tokenized_selector.as_bytes(),
+                                ),
+                                term: hex::encode(
+                                    &serde_json::to_vec(&entry.term).map_err(Error::Parse)?,
+                                ),
+                                record,
+                                parent_is_array: entry.parent_is_array,
+                            })
+                        })
+                        .collect();
+
+                    (ciphertext, Some(ste_vec_entries?))
+                }
+                encryption::Encrypted::Record(ciphertext, _terms) => {
+                    let ciphertext = ciphertext
+                        .to_mp_base85()
+                        // The error type from `to_mp_base85` isn't public, so we don't derive an error for this one.
+                        // Instead, we use `map_err`.
+                        .map_err(|err| Error::Base85(err.to_string()))?;
+
+                    (ciphertext, None)
+                }
             };
 
-            for index_term in terms {
-                match index_term {
-                    IndexTerm::Binary(bytes) => {
-                        indexes.unique_index = Some(format_index_term_binary(&bytes))
-                    }
-                    IndexTerm::BitMap(inner) => indexes.match_index = Some(inner),
-                    IndexTerm::OreArray(vec_of_bytes) => {
-                        indexes.ore_index = Some(format_index_term_ore_array(&vec_of_bytes));
-                    }
-                    IndexTerm::OreFull(bytes) => {
-                        indexes.ore_index = Some(format_index_term_ore(&bytes));
-                    }
-                    IndexTerm::OreLeft(bytes) => {
-                        indexes.ore_index = Some(format_index_term_ore(&bytes));
-                    }
-                    IndexTerm::Null => {}
-                    term => return Err(Error::Unimplemented(format!("index term `{term:?}`"))),
-                };
-            }
+            Ok(Encrypted::SteVec {
+                ciphertext,
+                data_type: cast_as.to_string(),
+                ste_vec_index,
+                identifier: identifier.to_owned(),
+                version: 2,
+            })
+        }
 
+        // Non-JSONB types with indexes
+        (_, encryption::Encrypted::Record(ciphertext, terms)) => {
             let ciphertext = ciphertext
                 .to_mp_base85()
                 // The error type from `to_mp_base85` isn't public, so we don't derive an error for this one.
                 // Instead, we use `map_err`.
                 .map_err(|err| Error::Base85(err.to_string()))?;
 
+            let mut unique_index = None;
+            let mut ore_index = None;
+            let mut match_index = None;
+
+            for index_term in terms {
+                match index_term {
+                    IndexTerm::Binary(bytes) => {
+                        unique_index = Some(format_index_term_binary(&bytes))
+                    }
+                    IndexTerm::BitMap(inner) => match_index = Some(inner),
+                    IndexTerm::OreArray(vec_of_bytes) => {
+                        ore_index = Some(format_index_term_ore_array(&vec_of_bytes));
+                    }
+                    IndexTerm::OreFull(bytes) => {
+                        ore_index = Some(format_index_term_ore(&bytes));
+                    }
+                    IndexTerm::OreLeft(bytes) => {
+                        ore_index = Some(format_index_term_ore(&bytes));
+                    }
+                    IndexTerm::Null => {}
+                    term => return Err(Error::Unimplemented(format!("index term `{term:?}`"))),
+                };
+            }
+
             Ok(Encrypted::Ciphertext {
                 ciphertext,
                 data_type: cast_as.to_string(),
-                unique_index: indexes.unique_index,
-                ore_index: indexes.ore_index,
-                match_index: indexes.match_index,
+                unique_index,
+                ore_index,
+                match_index,
                 identifier: identifier.to_owned(),
                 version: 2,
             })
         }
-        encryption::Encrypted::SteVec(ste_vec_index) => {
-            let root_ciphertext = ste_vec_index.root_ciphertext().map_err(|e| {
-                Error::InvariantViolation(format!("failed to get root ciphertext: {}", e))
-            })?;
 
-            let ciphertext = root_ciphertext
-                .to_mp_base85()
-                // The error type from `to_mp_base85` isn't public, so we don't derive an error for this one.
-                // Instead, we use `map_err`.
-                .map_err(|err| Error::Base85(err.to_string()))?;
-
-            let ste_vec_entries: Result<Vec<SteVecEntry>, Error> = ste_vec_index
-                .into_iter()
-                .map(|entry| {
-                    let record = entry
-                        .record
-                        .to_mp_base85()
-                        // The error type from `to_mp_base85` isn't public, so we don't derive an error for this one.
-                        // Instead, we use `map_err`.
-                        .map_err(|err| Error::Base85(err.to_string()))?;
-
-                    Ok(SteVecEntry {
-                        tokenized_selector: hex::encode(entry.tokenized_selector.as_bytes()),
-                        term: hex::encode(&serde_json::to_vec(&entry.term).map_err(Error::Parse)?),
-                        record,
-                        parent_is_array: entry.parent_is_array,
-                    })
-                })
-                .collect();
-
-            let ste_vec_entries = ste_vec_entries?;
-
-            Ok(Encrypted::SteVec {
-                ciphertext,
-                data_type: cast_as.to_string(),
-                ste_vec_index: ste_vec_entries,
-                identifier: identifier.to_owned(),
-                version: 2,
-            })
-        }
+        // Non-JSONB types should never return SteVec
+        (_, encryption::Encrypted::SteVec(_)) => Err(Error::InvariantViolation(
+            "non-JSONB type returned SteVec from encryption library".to_string(),
+        )),
     }
 }
 
@@ -924,6 +940,26 @@ mod lib {
             }
         }
 
+        /// Create a sample SteVec `Encrypted` variant for testing.
+        fn create_encrypted_ste_vec(
+            table: &str,
+            column: &str,
+            ciphertext: &str,
+            data_type: &str,
+            ste_vec_entries: Option<Vec<SteVecEntry>>,
+        ) -> Encrypted {
+            Encrypted::SteVec {
+                ciphertext: ciphertext.to_string(),
+                data_type: data_type.to_string(),
+                ste_vec_index: ste_vec_entries,
+                identifier: Identifier {
+                    table: table.to_string(),
+                    column: column.to_string(),
+                },
+                version: TEST_SCHEMA_VERSION,
+            }
+        }
+
         /// Assert that a null pointer error is returned as a valid C string.
         fn assert_null_pointer_error(error_ptr: *mut c_char) {
             assert!(!error_ptr.is_null());
@@ -969,6 +1005,18 @@ mod lib {
             let identifier_json = &parsed_json["i"];
             assert_eq!(identifier_json["t"], TEST_TABLE);
             assert_eq!(identifier_json["c"], TEST_COLUMN);
+        }
+
+        #[test]
+        fn test_encrypted_ste_vec_json_format_with_null_entries() {
+            let sample_encrypted =
+                create_encrypted_ste_vec(TEST_TABLE, TEST_COLUMN, TEST_CIPHERTEXT, "jsonb", None);
+
+            let json_string = serde_json::to_string(&sample_encrypted).unwrap();
+            let parsed_json: serde_json::Value = serde_json::from_str(&json_string).unwrap();
+
+            assert_eq!(parsed_json["k"], "sv");
+            assert_eq!(parsed_json["sv"], serde_json::Value::Null);
         }
 
         #[test]
