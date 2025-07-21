@@ -563,6 +563,7 @@ class ClientTest extends TestCase
             $encryptResultJson = $client->encrypt($clientPtr, $sessionData, 'session', 'users');
             $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
+            $this->assertIsArray($encryptResult);
             $this->assertSame('sv', $encryptResult['k']);
             $this->assertSame('jsonb', $encryptResult['dt']);
             $this->assertNull($encryptResult['sv']);
