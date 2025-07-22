@@ -45,6 +45,10 @@ class ClientTest extends TestCase
                             ],
                         ],
                     ],
+                    'session' => [
+                        'cast_as' => 'jsonb',
+                        'indexes' => (object) [],
+                    ],
                 ],
             ],
         ], JSON_THROW_ON_ERROR);
@@ -430,7 +434,7 @@ class ClientTest extends TestCase
         }
     }
 
-    public function test_decrypt_fails_with_wrong_tag_context(): void
+    public function test_decrypt_throws_exception_with_wrong_tag_context(): void
     {
         $client = new Client;
         $clientPtr = $client->newClient(self::$config);
@@ -465,7 +469,7 @@ class ClientTest extends TestCase
         }
     }
 
-    public function test_decrypt_fails_with_wrong_value_context(): void
+    public function test_decrypt_throws_exception_with_wrong_value_context(): void
     {
         $client = new Client;
         $clientPtr = $client->newClient(self::$config);
@@ -543,6 +547,26 @@ class ClientTest extends TestCase
 
             $this->expectException(FFIException::class);
             $client->decrypt($clientPtr, $ciphertext, 'invalid-context');
+        } finally {
+            $client->freeClient($clientPtr);
+        }
+    }
+
+    public function test_encrypt_jsonb_returns_null_sv_on_non_ste_vec_column(): void
+    {
+        $client = new Client;
+        $clientPtr = $client->newClient(self::$config);
+
+        try {
+            $sessionData = '{"browser": "Safari 17.4", "ip": "123.456.7.8", "last_active": "2020-01-21T10:30:00Z"}';
+
+            $encryptResultJson = $client->encrypt($clientPtr, $sessionData, 'session', 'users');
+            $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+
+            $this->assertIsArray($encryptResult);
+            $this->assertSame('sv', $encryptResult['k']);
+            $this->assertSame('jsonb', $encryptResult['dt']);
+            $this->assertNull($encryptResult['sv']);
         } finally {
             $client->freeClient($clientPtr);
         }

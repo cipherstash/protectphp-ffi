@@ -506,7 +506,7 @@ Response parameters:
 | `k` | `string` | Always | Key type identifier (always `sv` for structured vector) |
 | `c` | `string` | Always | Base85-encoded ciphertext containing the encrypted data |
 | `dt` | `string` | Always | Data type for casting (from `cast_as` configuration parameter) |
-| `sv` | `array` | `ste_vec` | Structured text encryption vector for JSONB containment queries |
+| `sv` | `array\|null` | `ste_vec` | Structured text encryption vector for JSONB containment queries |
 | `sv[].s` | `string` | `ste_vec` | Tokenized selector representing the encrypted JSON path to the value |
 | `sv[].t` | `string` | `ste_vec` | Encrypted term value for equality and order-preserving queries |
 | `sv[].r` | `string` | `ste_vec` | Base85-encoded ciphertext containing the encrypted record data |
@@ -973,7 +973,7 @@ Response parameters:
 
 | Parameter | Type | Source | Description |
 |-----------|------|--------|-------------|
-| `sv` | `array` | `ste_vec` | Structured text encryption vector for JSONB containment queries |
+| `sv` | `array\|null` | `ste_vec` | Structured text encryption vector for JSONB containment queries |
 | `sv[].s` | `string` | `ste_vec` | Tokenized selector representing the encrypted JSON path to the value |
 | `sv[].t` | `string` | `ste_vec` | Encrypted term value for equality and order-preserving queries |
 | `sv[].r` | `string` | `ste_vec` | Base85-encoded ciphertext containing the encrypted record data |
