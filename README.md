@@ -1,8 +1,8 @@
 # Protect.php FFI
 
-Protect.php FFI provides PHP bindings for the [CipherStash Client SDK](https://crates.io/crates/cipherstash-client) via PHP's [Foreign Function Interface (FFI)](https://www.php.net/manual/en/book.ffi.php).
+Protect.php FFI provides PHP bindings for the [CipherStash Client SDK](https://crates.io/crates/cipherstash-client) via PHP's [Foreign Function Interface (FFI)](https://www.php.net/manual/en/book.ffi.php). Field-level encryption operations happen directly in your application using a unique key for each encrypted value, managed by CipherStash [ZeroKMS](https://cipherstash.com/products/zerokms) and backed by [AWS KMS](https://docs.aws.amazon.com/kms/latest/developerguide/overview.html). The encrypted data can be stored in any JSONB-compatible database while maintaining searchability on PostgreSQL.
 
-Field-level encryption operations happen directly in your application using a unique key for each encrypted value, managed by CipherStash [ZeroKMS](https://cipherstash.com/products/zerokms) and backed by [AWS KMS](https://docs.aws.amazon.com/kms/latest/developerguide/overview.html). The encrypted data can be stored in any database that supports JSONB.
+This library operates at a low level, providing direct access to the native cryptographic operations. It requires manual memory management and detailed encryption configuration, designed for advanced use cases where you need fine-grained control over the encryption process.
 
 > [!IMPORTANT]
 > For most applications, you'll want to use the [Protect.php](https://github.com/cipherstash/protectphp) library instead, as it provides a more convenient API built on top of these bindings.
@@ -43,12 +43,13 @@ Protect.php FFI works with any database that supports JSONB storage. The encrypt
 For advanced querying capabilities (searching, sorting, filtering), you'll need PostgreSQL with the EQL extension. EQL provides the `eql_v2_encrypted` type:
 
 ```sql
-CREATE TABLE patient_records (
+CREATE TABLE users (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     email eql_v2_encrypted,
-    systolic_bp eql_v2_encrypted,
-    medical_notes eql_v2_encrypted,
-    health_assessment eql_v2_encrypted,
+    name eql_v2_encrypted,
+    balance eql_v2_encrypted,
+    contact eql_v2_encrypted,
+    notes eql_v2_encrypted,
     CONSTRAINT unique_email UNIQUE ((email->>'hm')) -- Enforce unique emails
 );
 ```
@@ -65,16 +66,33 @@ Basic structure:
 $config = [
     'v' => 2,
     'tables' => [
-        'table_name' => [
-            'column_name' => [
-                'cast_as' => 'data_type',
+        'users' => [
+            'email' => [
+                'cast_as' => 'text',
                 'indexes' => [
-                    'unique' => [
-                        'token_filters' => [
-                            ['kind' => 'downcase'],
-                        ],
-                    ],
+                    'unique' => (object) [],
                     'match' => (object) [],
+                ],
+            ],
+            'balance' => [
+                'cast_as' => 'int',
+                'indexes' => [
+                    'unique' => (object) [],
+                    'ore' => (object) [],
+                ],
+            ],
+            'notes' => [
+                'cast_as' => 'text',
+                'indexes' => [
+                    'match' => (object) [],
+                ],
+            ],
+            'contact' => [
+                'cast_as' => 'jsonb',
+                'indexes' => [
+                    'ste_vec' => [
+                        'prefix' => 'users.contact',
+                    ],
                 ],
             ],
         ],
@@ -88,17 +106,17 @@ Configuration parameters:
 |-----------|------|----------|-------------|
 | `v` | `int` | ✓ | Schema version for backward compatibility (must be `2`) |
 | `tables` | `object` | ✓ | Table definitions containing column configurations |
-| `tables.<table_name>` | `object` | ✓ | Column definitions for the specified table |
-| `tables.<table_name>.<column_name>` | `object` | ✓ | Configuration for the specified column |
-| `tables.<table_name>.<column_name>.cast_as` | `string` | ✗ | Data type for processing before encryption (defaults to `text`) |
-| `tables.<table_name>.<column_name>.indexes` | `object` | ✗ | Encryption indexes for query patterns |
-| `tables.<table_name>.<column_name>.indexes.<index_type>` | `object` | ✗ | Configuration parameters for the specified index type (see individual index type documentation) |
-| `tables.<table_name>.<column_name>.indexes.<index_type>.<param>` | `mixed` | ✗ | Index-specific configuration parameter |
+| `tables.<table>` | `object` | ✓ | Column definitions for the specified table |
+| `tables.<table>.<column>` | `object` | ✓ | Configuration for the specified column |
+| `tables.<table>.<column>.cast_as` | `string` | ✗ | Data type for processing before encryption (defaults to `text`) |
+| `tables.<table>.<column>.indexes` | `object` | ✗ | Encryption indexes for query patterns |
+| `tables.<table>.<column>.indexes.<index_type>` | `object` | ✗ | Configuration parameters for the specified index type (see individual index type documentation) |
+| `tables.<table>.<column>.indexes.<index_type>.<param>` | `mixed` | ✗ | Index-specific configuration parameter |
 
 > [!IMPORTANT]
 > When configuring indexes without parameters, you must use `(object) []` instead of an empty array `[]`. This ensures PHP's `json_encode()` produces a JSON object (`{}`) rather than a JSON array (`[]`), which is required by the native library's configuration parser.
 
-**Data Types**
+### Data Types
 
 The `cast_as` parameter determines how plaintext data is processed before encryption:
 
@@ -114,7 +132,7 @@ The `cast_as` parameter determines how plaintext data is processed before encryp
 | `date` | Date strings in ISO format | `2020-11-10` |
 | `jsonb` | JSON data | `{"key": "value"}` |
 
-**Index Types**
+### Index Types
 
 The `indexes` parameter determines what queries are supported on encrypted data:
 
@@ -125,14 +143,14 @@ The `indexes` parameter determines what queries are supported on encrypted data:
 | `match` | Full-text search queries | `bf` | `~~` |
 | `ste_vec` | JSONB containment queries | `sv` | `@>`, `<@` |
 
-**Unique Index (`unique`)**
+#### Unique Index (`unique`)
 
 Enables exact equality queries and database uniqueness constraints. Uses the `hm` response parameter to generate HMAC-based hashes for exact equality matching.
 
 Basic usage:
 
 ```php
-'patient_records' => [
+'users' => [
     'email' => [
         'cast_as' => 'text',
         'indexes' => [
@@ -152,7 +170,7 @@ Configuration parameters:
 With custom parameters:
 
 ```php
-'patient_records' => [
+'users' => [
     'email' => [
         'cast_as' => 'text',
         'indexes' => [
@@ -166,30 +184,21 @@ With custom parameters:
 ],
 ```
 
-Example SQL query:
-
-```sql
--- Find patient record by email address
--- Using search terms (encrypted ahead of time, plaintext not loggable):
-SELECT * FROM patient_records
-WHERE email = '{"hm":"0f4f3b99671e74c0f8b5a1d2e3f4a5b6c7d8...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"}}'::jsonb;
-```
-
 For database-level uniqueness constraints, add a unique constraint on the `hm` response parameter:
 
 ```sql
 CONSTRAINT unique_email UNIQUE ((email->>'hm'))
 ```
 
-**Order Revealing Encryption Index (`ore`)**
+#### Order Revealing Encryption Index (`ore`)
 
 Enables equality, range operations, and ordering on encrypted data. Uses the `ob` response parameter to create order-preserving encrypted values for equality checks, range comparisons, and sorting operations.
 
 Basic usage:
 
 ```php
-'patient_records' => [
-    'systolic_bp' => [
+'users' => [
+    'balance' => [
         'cast_as' => 'int',
         'indexes' => [
             'ore' => (object) [],
@@ -202,44 +211,15 @@ Configuration parameters:
 
 *This index type has no configurable parameters.*
 
-Example SQL queries:
-
-```sql
--- Find patients with exact blood pressure value
--- Using search terms (encrypted ahead of time, plaintext not loggable):
-SELECT * FROM patient_records
-WHERE systolic_bp = '{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'::jsonb;
-
--- Find patients with blood pressure above specified threshold
--- Using search terms (encrypted ahead of time, plaintext not loggable):
-SELECT * FROM patient_records
-WHERE systolic_bp >= '{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'::jsonb;
-
--- Find patients with blood pressure in specified range
--- Using search terms (encrypted ahead of time, plaintext not loggable):
-SELECT * FROM patient_records
-WHERE systolic_bp BETWEEN
-      '{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'::jsonb
-  AND '{"hm":null,"ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"patient_records","c":"systolic_bp"}}'::jsonb;
-
--- Order patients by blood pressure from lowest to highest
-SELECT * FROM patient_records
-ORDER BY systolic_bp ASC;
-
--- Order patients by blood pressure from highest to lowest
-SELECT * FROM patient_records
-ORDER BY systolic_bp DESC;
-```
-
-**Match Index (`match`)**
+#### Match Index (`match`)
 
 Enables full-text search on encrypted text data using bloom filters. Uses the `bf` response parameter to create bloom filter representations of tokenized text for probabilistic matching.
 
 Basic usage:
 
 ```php
-'patient_records' => [
-    'medical_notes' => [
+'users' => [
+    'notes' => [
         'cast_as' => 'text',
         'indexes' => [
             'match' => (object) [], // Uses defaults
@@ -264,8 +244,8 @@ Configuration parameters:
 With custom parameters:
 
 ```php
-'patient_records' => [
-    'medical_notes' => [
+'users' => [
+    'notes' => [
         'cast_as' => 'text',
         'indexes' => [
             'match' => [
@@ -285,28 +265,19 @@ With custom parameters:
 ],
 ```
 
-Example SQL query:
-
-```sql
--- Find patients with medical notes containing specified terms
--- Using search terms (encrypted ahead of time, plaintext not loggable):
-SELECT * FROM patient_records
-WHERE medical_notes ~~ '{"hm":null,"ob":null,"bf":[1397,378,1463,1673,1474,1226],"i":{"t":"patient_records","c":"medical_notes"}}'::jsonb;
-```
-
-**Structured Text Encryption Vector Index (`ste_vec`)**
+#### Structured Text Encryption Vector Index (`ste_vec`)
 
 Enables containment queries on encrypted JSONB data. Uses the `sv` response parameter to create structured text encryption vectors that preserve JSON path relationships for encrypted JSONB containment matching.
 
 Basic usage:
 
 ```php
-'patient_records' => [
-    'health_assessment' => [
+'users' => [
+    'contact' => [
         'cast_as' => 'jsonb',
         'indexes' => [
             'ste_vec' => [
-                'prefix' => 'patient_records.health_assessment',
+                'prefix' => 'users.contact',
             ],
         ],
     ],
@@ -317,21 +288,7 @@ Configuration parameters:
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `prefix` | `string` | ✓ | - | Domain separator for cryptographic hashing that must be unique per column (recommended format is `table_name.column_name`) |
-
-Example SQL queries:
-
-```sql
--- Find records where encrypted data contains specified values
--- Using search terms (encrypted ahead of time, plaintext not loggable):
-SELECT * FROM patient_records
-WHERE health_assessment @> '{"sv":[{"s":"dd4659b9c279af040dd05ce21b2a22f7...","t":"22303061363334333330316661653633...","r":"mBbL}QHJ&a(@rwS5n)u^G+Fb+t}Soo-h...","pa":false}],"i":{"t":"patient_records","c":"health_assessment"}}'::jsonb;
-
--- Find records where encrypted data is contained by specified values
--- Using search terms (encrypted ahead of time, plaintext not loggable):
-SELECT * FROM patient_records
-WHERE health_assessment <@ '{"sv":[{"s":"df08a4c4157bdb5bf6fa9be89cf18d10...","t":"22303063343133306135646334356130...","r":"mBbL}QHJ&a(@rwS5n)u^G+Fb+Ex8ofB!...","pa":false}],"i":{"t":"patient_records","c":"health_assessment"}}'::jsonb;
-```
+| `prefix` | `string` | ✓ | - | Domain separator for cryptographic hashing that must be unique per column (recommended format is `table.column`) |
 
 ## Creating a Client
 
@@ -345,30 +302,31 @@ $client = new Client;
 $config = [
     'v' => 2,
     'tables' => [
-        'patient_records' => [
+        'users' => [
             'email' => [
                 'cast_as' => 'text',
                 'indexes' => [
                     'unique' => (object) [],
                 ],
             ],
-            'systolic_bp' => [
+            'balance' => [
                 'cast_as' => 'int',
                 'indexes' => [
+                    'unique' => (object) [],
                     'ore' => (object) [],
                 ],
             ],
-            'medical_notes' => [
+            'notes' => [
                 'cast_as' => 'text',
                 'indexes' => [
                     'match' => (object) [],
                 ],
             ],
-            'health_assessment' => [
+            'contact' => [
                 'cast_as' => 'jsonb',
                 'indexes' => [
                     'ste_vec' => [
-                        'prefix' => 'patient_records.health_assessment',
+                        'prefix' => 'users.contact',
                     ],
                 ],
             ],
@@ -403,11 +361,12 @@ $client = new Client;
 $config = [
     'v' => 2,
     'tables' => [
-        'patient_records' => [
+        'users' => [
             'email' => [
                 'cast_as' => 'text',
                 'indexes' => [
                     'unique' => (object) [],
+                    'match' => (object) [],
                 ],
             ],
         ],
@@ -424,10 +383,10 @@ try {
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
-        tableName: 'patient_records',
+        tableName: 'users',
     );
 
-    // {"k":"ct","c":"mBbKlk}G7QdaGiNj$dL7#+AOrA^}*VJx...","dt":"text","hm":"f3ca71fd39ae9d3d1d1fc25141bcb6da...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"},"v":2}
+    // {"k":"ct","c":"mBbKlk}G7QdaGiNj$dL7#+AOrA^}*VJx...","dt":"text","hm":"f3ca71fd39ae9d3d1d1fc25141bcb6da...","ob":null,"bf":[1124,2134,987,1456,743,2201],"i":{"t":"users","c":"email"},"v":2}
 } finally {
     if ($clientPtr !== null) {
         $client->freeClient($clientPtr);
@@ -440,9 +399,9 @@ try {
 
 ### Encryption Response
 
-The `encrypt()` method returns a JSON string containing the encrypted data. The response format depends on the configured indexes.
+The `encrypt()` method returns a JSON string containing the encrypted envelope. The response format depends on the configured indexes.
 
-**Standard Indexes Response**
+#### Standard Indexes Response
 
 For columns configured with the `unique`, `ore`, and/or `match` indexes:
 
@@ -453,9 +412,9 @@ For columns configured with the `unique`, `ore`, and/or `match` indexes:
     "dt": "text",
     "hm": "f3ca71fd39ae9d3d1d1fc25141bcb6da...",
     "ob": null,
-    "bf": null,
+    "bf": [1124,2134,987,1456,743,2201],
     "i": {
-        "t": "patient_records",
+        "t": "users",
         "c": "email"
     },
     "v": 2
@@ -472,10 +431,10 @@ Response parameters:
 | `hm` | `string\|null` | `unique` | HMAC index for exact equality queries and uniqueness constraints |
 | `ob` | `array\|null` | `ore` | Order-revealing encryption index for range queries |
 | `bf` | `array\|null` | `match` | Bloom filter index for full-text search queries |
-| `i` | `object` | Always | Table and column identifier for this encrypted value: `{"t":"table_name","c":"column_name"}` |
+| `i` | `object` | Always | Table and column identifier for this encrypted value: `{"t":"table","c":"column"}` |
 | `v` | `int` | Always | Schema version for backward compatibility |
 
-**STE Vec Index Response**
+#### STE Vec Index Response
 
 For columns configured with the `ste_vec` index:
 
@@ -493,8 +452,8 @@ For columns configured with the `ste_vec` index:
         }
     ],
     "i": {
-        "t": "patient_records",
-        "c": "health_assessment"
+        "t": "users",
+        "c": "contact"
     },
     "v": 2
 }
@@ -512,7 +471,7 @@ Response parameters:
 | `sv[].t` | `string` | `ste_vec` | Encrypted term value for equality and order-preserving queries |
 | `sv[].r` | `string` | `ste_vec` | Base85-encoded ciphertext containing the encrypted record data |
 | `sv[].pa` | `boolean` | `ste_vec` | Whether the parent JSON element is an array |
-| `i` | `object` | Always | Table and column identifier for this encrypted value: `{"t":"table_name","c":"column_name"}` |
+| `i` | `object` | Always | Table and column identifier for this encrypted value: `{"t":"table","c":"column"}` |
 | `v` | `int` | Always | Schema version for backward compatibility |
 
 ## Decrypting Data
@@ -527,11 +486,12 @@ $client = new Client;
 $config = [
     'v' => 2,
     'tables' => [
-        'patient_records' => [
+        'users' => [
             'email' => [
                 'cast_as' => 'text',
                 'indexes' => [
                     'unique' => (object) [],
+                    'match' => (object) [],
                 ],
             ],
         ],
@@ -548,7 +508,7 @@ try {
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
-        tableName: 'patient_records',
+        tableName: 'users',
     );
 
     $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
@@ -569,7 +529,7 @@ Returns the decrypted plaintext as a string.
 
 Provide additional encryption context for an additional layer of security by binding encrypted data to specific contextual information of your choosing. This prevents data encrypted with one context from being decrypted with a different context, even when using the same encryption keys.
 
-**Context Types**
+### Context Types
 
 The `context` parameter determines what contextual authentication is supported:
 
@@ -600,11 +560,12 @@ $client = new Client;
 $config = [
     'v' => 2,
     'tables' => [
-        'patient_records' => [
+        'users' => [
             'email' => [
                 'cast_as' => 'text',
                 'indexes' => [
                     'unique' => (object) [],
+                    'match' => (object) [],
                 ],
             ],
         ],
@@ -627,7 +588,7 @@ try {
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
-        tableName: 'patient_records',
+        tableName: 'users',
         contextJson: $contextJson,
     );
 
@@ -636,7 +597,6 @@ try {
     $ciphertext = $encryptResult['c'];
 
     $decryptResult = $client->decrypt($clientPtr, $ciphertext, $contextJson); // john@example.com
-
 } finally {
     if ($clientPtr !== null) {
         $client->freeClient($clientPtr);
@@ -656,11 +616,12 @@ $client = new Client;
 $config = [
     'v' => 2,
     'tables' => [
-        'patient_records' => [
+        'users' => [
             'email' => [
                 'cast_as' => 'text',
                 'indexes' => [
                     'unique' => (object) [],
+                    'match' => (object) [],
                 ],
             ],
         ],
@@ -686,7 +647,7 @@ try {
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
-        tableName: 'patient_records',
+        tableName: 'users',
         contextJson: $contextJson,
     );
 
@@ -695,7 +656,6 @@ try {
     $ciphertext = $encryptResult['c'];
 
     $decryptResult = $client->decrypt($clientPtr, $ciphertext, $contextJson); // john@example.com
-
 } finally {
     if ($clientPtr !== null) {
         $client->freeClient($clientPtr);
@@ -722,14 +682,15 @@ $client = new Client;
 $config = [
     'v' => 2,
     'tables' => [
-        'patient_records' => [
+        'users' => [
             'email' => [
                 'cast_as' => 'text',
                 'indexes' => [
                     'unique' => (object) [],
+                    'match' => (object) [],
                 ],
             ],
-            'medical_notes' => [
+            'notes' => [
                 'cast_as' => 'text',
                 'indexes' => [
                     'match' => (object) [],
@@ -749,18 +710,18 @@ try {
         [
             'plaintext' => 'john@example.com',
             'column' => 'email',
-            'table' => 'patient_records',
+            'table' => 'users',
         ],
         [
-            'plaintext' => 'Patient shows improvement in mobility and pain management.',
-            'column' => 'medical_notes',
-            'table' => 'patient_records',
+            'plaintext' => 'Account flagged for fraud monitoring after suspicious transaction pattern detected. Customer disputed charges on 2007-07-27. Priority support required for high-value client.',
+            'column' => 'notes',
+            'table' => 'users',
         ],
     ];
 
     $itemsJson = json_encode($items, JSON_THROW_ON_ERROR);
     $encryptResultsJson = $client->encryptBulk($clientPtr, $itemsJson);
-    // [{"k":"ct","c":"mBbKuXT|+vBh~K2WV-!n5_W3DBFd4`Mp...","dt":"text","hm":"f3ca71fd39ae9d3d1d1fc25141bcb6da...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"},"v":2},{"k":"ct","c":"mBbJ<8tOEI+Z`KFUV`q&kmdWtO#DKxW|...","dt":"text","hm":null,"ob":null,"bf":[1397,378,1463,1673,1474,1226],"i":{"t":"patient_records","c":"medical_notes"},"v":2}]
+    // [{"k":"ct","c":"mBbKuXT|+vBh~K2WV-!n5_W3DBFd4`Mp...","dt":"text","hm":"f3ca71fd39ae9d3d1d1fc25141bcb6da...","ob":null,"bf":[1124,2134,987,1456,743,2201],"i":{"t":"users","c":"email"},"v":2},{"k":"ct","c":"mBbJ<8tOEI+Z`KFUV`q&kmdWtO#DKxW|...","dt":"text","hm":null,"ob":null,"bf":[1397,378,1463,1673,1474,1226],"i":{"t":"users","c":"notes"},"v":2}]
 } finally {
     if ($clientPtr !== null) {
         $client->freeClient($clientPtr);
@@ -768,7 +729,7 @@ try {
 }
 ```
 
-Returns a JSON array where each element follows the same structure as documented in the [Encryption Response](#encryption-response) section.
+Returns a JSON array of encrypted envelopes where each element follows the same structure as documented in the [Encryption Response](#encryption-response) section.
 
 ### Bulk Decryption
 
@@ -782,14 +743,15 @@ $client = new Client;
 $config = [
     'v' => 2,
     'tables' => [
-        'patient_records' => [
+        'users' => [
             'email' => [
                 'cast_as' => 'text',
                 'indexes' => [
                     'unique' => (object) [],
+                    'match' => (object) [],
                 ],
             ],
-            'medical_notes' => [
+            'notes' => [
                 'cast_as' => 'text',
                 'indexes' => [
                     'match' => (object) [],
@@ -809,15 +771,15 @@ try {
         [
             'plaintext' => 'john@example.com',
             'column' => 'email',
-            'table' => 'patient_records',
+            'table' => 'users',
             'context' => [
                 'tag' => ['pii', 'hipaa'],
             ],
         ],
         [
-            'plaintext' => 'Patient shows improvement in mobility and pain management.',
-            'column' => 'medical_notes',
-            'table' => 'patient_records',
+            'plaintext' => 'Account flagged for fraud monitoring after suspicious transaction pattern detected. Customer disputed charges on 2007-07-27. Priority support required for high-value client.',
+            'column' => 'notes',
+            'table' => 'users',
         ],
     ];
 
@@ -839,7 +801,7 @@ try {
     // [{"ciphertext":"mBbK>BcAYctW$Gy)vK2)Y$&nBBKz{oL1...","context":{"tag":["pii","hipaa"]}},{"ciphertext":"mBbJ<8tOEI+Z`KFUV`q&kmdWtO#DKxW|..."}]
 
     $decryptResultsJson = $client->decryptBulk($clientPtr, $decryptItemsJson);
-    // ["john@example.com", "Patient shows improvement in mobility and pain management."]
+    // ["john@example.com", "Account flagged for fraud monitoring after suspicious transaction pattern detected. Customer disputed charges on 2007-07-27. Priority support required for high-value client."]
 } finally {
     if ($clientPtr !== null) {
         $client->freeClient($clientPtr);
@@ -861,16 +823,18 @@ $client = new Client;
 $config = [
     'v' => 2,
     'tables' => [
-        'patient_records' => [
+        'users' => [
             'email' => [
                 'cast_as' => 'text',
                 'indexes' => [
                     'unique' => (object) [],
+                    'match' => (object) [],
                 ],
             ],
-            'systolic_bp' => [
+            'balance' => [
                 'cast_as' => 'int',
                 'indexes' => [
+                    'unique' => (object) [],
                     'ore' => (object) [],
                 ],
             ],
@@ -888,21 +852,21 @@ try {
         [
             'plaintext' => 'john@example.com',
             'column' => 'email',
-            'table' => 'patient_records',
+            'table' => 'users',
             'context' => [
                 'tag' => ['pii', 'hipaa'],
             ],
         ],
         [
-            'plaintext' => '120',
-            'column' => 'systolic_bp',
-            'table' => 'patient_records',
+            'plaintext' => '1575000',
+            'column' => 'balance',
+            'table' => 'users',
         ],
     ];
 
     $searchTermsJson = json_encode($searchTerms, JSON_THROW_ON_ERROR);
     $searchTermResultsJson = $client->createSearchTerms($clientPtr, $searchTermsJson);
-    // [{"hm":"f3ca71fd39ae9d3d1d1fc25141bcb6da...","ob":null,"bf":null,"i":{"t":"patient_records","c":"email"}}, ...]
+    // [{"hm":"f3ca71fd39ae9d3d1d1fc25141bcb6da...","ob":null,"bf":[1124,2134,987,1456,743,2201],"i":{"t":"users","c":"email"}},{"hm":"a8d5f2e9c4b7a1f3e8d2c5b9f6a3e7d1...","ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"users","c":"balance"}}]
 } finally {
     if ($clientPtr !== null) {
         $client->freeClient($clientPtr);
@@ -911,6 +875,79 @@ try {
 ```
 
 This feature integrates with [EQL](https://github.com/cipherstash/encrypt-query-language) and is currently only supported on PostgreSQL databases.
+
+### Querying with Search Terms
+
+These examples demonstrate how to use search terms with PostgreSQL and EQL for querying encrypted data without decryption. Each query uses the complete search terms object, and EQL automatically selects the appropriate index for the query operation.
+
+#### Exact Equality Queries
+
+For exact equality queries, EQL uses the `unique` index (`hm` response parameter) from your search terms:
+
+```sql
+-- Find user by email address
+-- Using search terms (encrypted ahead of time, plaintext not loggable):
+SELECT * FROM users
+WHERE email = '{"hm":"f3ca71fd39ae9d3d1d1fc25141bcb6da...","ob":null,"bf":[1124,2134,987,1456,743,2201],"i":{"t":"users","c":"email"}}'::jsonb;
+```
+
+#### Equality, Range, and Sorting Queries
+
+For equality, range comparisons, and sorting, EQL uses the `ore` index (`ob` response parameter) from your search terms:
+
+```sql
+-- Find users with exact balance amount
+-- Using search terms (encrypted ahead of time, plaintext not loggable):
+SELECT * FROM users
+WHERE balance = '{"hm":"a8d5f2e9c4b7a1f3e8d2c5b9f6a3e7d1...","ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"users","c":"balance"}}'::jsonb;
+
+-- Find users above specified balance
+-- Using search terms (encrypted ahead of time, plaintext not loggable):
+SELECT * FROM users
+WHERE balance >= '{"hm":"a8d5f2e9c4b7a1f3e8d2c5b9f6a3e7d1...","ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"users","c":"balance"}}'::jsonb;
+
+-- Find users with balance in specified range
+-- Using search terms (encrypted ahead of time, plaintext not loggable):
+SELECT * FROM users
+WHERE balance BETWEEN
+      '{"hm":"a8d5f2e9c4b7a1f3e8d2c5b9f6a3e7d1...","ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"users","c":"balance"}}'::jsonb
+  AND '{"hm":"a8d5f2e9c4b7a1f3e8d2c5b9f6a3e7d1...","ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"users","c":"balance"}}'::jsonb;
+
+-- Order users by balance from lowest to highest
+SELECT * FROM users
+ORDER BY balance ASC;
+
+-- Order users by balance from highest to lowest
+SELECT * FROM users
+ORDER BY balance DESC;
+```
+
+#### Full-Text Search Queries
+
+For searching within text content, EQL uses the `match` index (`bf` response parameter) from your search terms:
+
+```sql
+-- Find users with notes containing specified terms
+-- Using search terms (encrypted ahead of time, plaintext not loggable):
+SELECT * FROM users
+WHERE notes ~~ '{"hm":null,"ob":null,"bf":[1397,378,1463,1673,1474,1226],"i":{"t":"users","c":"notes"}}'::jsonb;
+```
+
+#### JSONB Containment Queries
+
+For structured data queries, EQL uses the `ste_vec` index (`sv` response parameter) from your search terms:
+
+```sql
+-- Find records where encrypted data contains specified values
+-- Using search terms (encrypted ahead of time, plaintext not loggable):
+SELECT * FROM users
+WHERE contact @> '{"sv":[{"s":"dd4659b9c279af040dd05ce21b2a22f7...","t":"22303061363334333330316661653633...","r":"mBbL}QHJ&a(@rwS5n)u^G+Fb+t}Soo-h...","pa":false}],"i":{"t":"users","c":"contact"}}'::jsonb;
+
+-- Find records where encrypted data is contained by specified values
+-- Using search terms (encrypted ahead of time, plaintext not loggable):
+SELECT * FROM users
+WHERE contact <@ '{"sv":[{"s":"df08a4c4157bdb5bf6fa9be89cf18d10...","t":"22303063343133306135646334356130...","r":"mBbL}QHJ&a(@rwS5n)u^G+Fb+Ex8ofB!...","pa":false}],"i":{"t":"users","c":"contact"}}'::jsonb;
+```
 
 ### Search Terms Response
 
@@ -924,9 +961,9 @@ For columns configured with `unique`, `ore`, and/or `match` indexes:
 {
     "hm": "f3ca71fd39ae9d3d1d1fc25141bcb6da...",
     "ob": null,
-    "bf": null,
+    "bf": [1124,2134,987,1456,743,2201],
     "i": {
-        "t": "patient_records",
+        "t": "users",
         "c": "email"
     }
 }
@@ -939,7 +976,7 @@ Response parameters:
 | `hm` | `string\|null` | `unique` | HMAC index for exact equality queries and uniqueness constraints |
 | `ob` | `array\|null` | `ore` | Order-revealing encryption index for range queries |
 | `bf` | `array\|null` | `match` | Bloom filter index for full-text search queries |
-| `i` | `object` | Always | Table and column identifier for this encrypted value: `{"t":"table_name","c":"column_name"}` |
+| `i` | `object` | Always | Table and column identifier for this encrypted value: `{"t":"table","c":"column"}` |
 
 #### STE Vec Index Response
 
@@ -962,8 +999,8 @@ For columns configured with `ste_vec` indexes:
         }
     ],
     "i": {
-        "t": "patient_records",
-        "c": "health_assessment"
+        "t": "users",
+        "c": "contact"
     }
 }
 ```
@@ -977,11 +1014,11 @@ Response parameters:
 | `sv[].t` | `string` | `ste_vec` | Encrypted term value for equality and order-preserving queries |
 | `sv[].r` | `string` | `ste_vec` | Base85-encoded ciphertext containing the encrypted record data |
 | `sv[].pa` | `boolean` | `ste_vec` | Whether the parent JSON element is an array |
-| `i` | `object` | Always | Table and column identifier for this encrypted value: `{"t":"table_name","c":"column_name"}` |
+| `i` | `object` | Always | Table and column identifier for this encrypted value: `{"t":"table","c":"column"}` |
 
 ## Error Handling
 
-Protect.php FFI operations may throw `FFIException` exceptions when errors occur during encryption, decryption, or client operations. Proper error handling ensures your application can gracefully handle configuration issues, network problems, or invalid data scenarios.
+Protect.php FFI operations may throw `FFIException` exceptions when errors occur during client, encryption, or decryption operations. Proper error handling ensures your application can gracefully handle configuration issues, network problems, or invalid data scenarios.
 
 ### Exception Types
 
@@ -996,28 +1033,29 @@ $client = new Client;
 $config = [
     'v' => 2,
     'tables' => [
-        'patient_records' => [
+        'users' => [
             'email' => [
                 'cast_as' => 'text',
                 'indexes' => [
                     'unique' => (object) [],
+                    'match' => (object) [],
                 ],
             ],
         ],
     ],
 ];
 
+$clientPtr = null;
+
 try {
     $configJson = json_encode($config, JSON_THROW_ON_ERROR);
-    $clientPtr = null;
-
     $clientPtr = $client->newClient($configJson);
 
     $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
         columnName: 'email',
-        tableName: 'patient_records',
+        tableName: 'users',
     );
 
     $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
