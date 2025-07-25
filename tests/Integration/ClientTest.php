@@ -631,8 +631,8 @@ class ClientTest extends TestCase
             ];
 
             $itemsJson = json_encode($items, JSON_THROW_ON_ERROR);
-            $encryptResultJson = $client->encryptBulk($clientPtr, $itemsJson);
-            $encryptResults = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+            $encryptResultsJson = $client->encryptBulk($clientPtr, $itemsJson);
+            $encryptResults = json_decode(json: $encryptResultsJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
             $this->assertIsArray($encryptResults);
             $this->assertCount(4, $encryptResults);
@@ -729,8 +729,8 @@ class ClientTest extends TestCase
             }, $ciphertexts);
 
             $encryptedItemsJson = json_encode($encryptedItems, JSON_THROW_ON_ERROR);
-            $decryptResultJson = $client->decryptBulk($clientPtr, $encryptedItemsJson);
-            $decryptResults = json_decode(json: $decryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+            $decryptResultsJson = $client->decryptBulk($clientPtr, $encryptedItemsJson);
+            $decryptResults = json_decode(json: $decryptResultsJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
             $expectedPlaintexts = [
                 'john@example.com',
@@ -778,8 +778,8 @@ class ClientTest extends TestCase
             ];
 
             $itemsJson = json_encode($items, JSON_THROW_ON_ERROR);
-            $encryptResultJson = $client->encryptBulk($clientPtr, $itemsJson);
-            $encryptResults = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+            $encryptResultsJson = $client->encryptBulk($clientPtr, $itemsJson);
+            $encryptResults = json_decode(json: $encryptResultsJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
             $this->assertIsArray($encryptResults);
             $this->assertCount(4, $encryptResults);
@@ -801,8 +801,8 @@ class ClientTest extends TestCase
             }, $items, $encryptResults);
 
             $decryptItemsJson = json_encode($decryptItems, JSON_THROW_ON_ERROR);
-            $decryptResultJson = $client->decryptBulk($clientPtr, $decryptItemsJson);
-            $decryptResults = json_decode(json: $decryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
+            $decryptResultsJson = $client->decryptBulk($clientPtr, $decryptItemsJson);
+            $decryptResults = json_decode(json: $decryptResultsJson, associative: true, flags: JSON_THROW_ON_ERROR);
 
             $expectedPlaintexts = [
                 'john@example.com',
@@ -849,7 +849,7 @@ class ClientTest extends TestCase
         $clientPtr = $client->newClient(self::$config);
 
         try {
-            $searchTerms = [
+            $items = [
                 [
                     'plaintext' => 'john@example.com',
                     'column' => 'email',
@@ -872,44 +872,44 @@ class ClientTest extends TestCase
                 ],
             ];
 
-            $searchTermsJson = json_encode($searchTerms, JSON_THROW_ON_ERROR);
-            $searchTermsResultJson = $client->createSearchTerms($clientPtr, $searchTermsJson);
+            $itemsJson = json_encode($items, JSON_THROW_ON_ERROR);
+            $searchTermResultsJson = $client->createSearchTerms($clientPtr, $itemsJson);
 
-            $searchTermsResult = json_decode(json: $searchTermsResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
-            $this->assertIsArray($searchTermsResult);
-            $this->assertCount(4, $searchTermsResult);
+            $searchTermResults = json_decode(json: $searchTermResultsJson, associative: true, flags: JSON_THROW_ON_ERROR);
+            $this->assertIsArray($searchTermResults);
+            $this->assertCount(4, $searchTermResults);
 
-            $emailTerm = $searchTermsResult[0];
+            $emailTerm = $searchTermResults[0];
             $this->assertIsArray($emailTerm);
             $this->assertNotNull($emailTerm['hm']);
             $this->assertNull($emailTerm['ob']);
             $this->assertNotNull($emailTerm['bf']);
             $this->assertArrayHasKey('i', $emailTerm);
 
-            $ageTerm = $searchTermsResult[1];
+            $ageTerm = $searchTermResults[1];
             $this->assertIsArray($ageTerm);
             $this->assertNull($ageTerm['hm']);
             $this->assertNotNull($ageTerm['ob']);
             $this->assertNull($ageTerm['bf']);
             $this->assertArrayHasKey('i', $ageTerm);
 
-            $jobTitleTerm = $searchTermsResult[2];
+            $jobTitleTerm = $searchTermResults[2];
             $this->assertIsArray($jobTitleTerm);
             $this->assertNull($jobTitleTerm['hm']);
             $this->assertNull($jobTitleTerm['ob']);
             $this->assertNotNull($jobTitleTerm['bf']);
             $this->assertArrayHasKey('i', $jobTitleTerm);
 
-            $metadataTerm = $searchTermsResult[3];
+            $metadataTerm = $searchTermResults[3];
             $this->assertIsArray($metadataTerm);
             $this->assertArrayHasKey('sv', $metadataTerm);
             $this->assertIsArray($metadataTerm['sv']);
             $this->assertNotEmpty($metadataTerm['sv']);
             $this->assertArrayHasKey('i', $metadataTerm);
 
-            foreach ($searchTermsResult as $searchTerms) {
-                $this->assertIsArray($searchTerms);
-                $identifier = $searchTerms['i'];
+            foreach ($searchTermResults as $searchTerm) {
+                $this->assertIsArray($searchTerm);
+                $identifier = $searchTerm['i'];
                 $this->assertIsArray($identifier);
                 $this->assertSame('users', $identifier['t']);
                 $this->assertContains($identifier['c'], ['email', 'age', 'job_title', 'metadata']);
@@ -925,7 +925,7 @@ class ClientTest extends TestCase
         $clientPtr = $client->newClient(self::$config);
 
         try {
-            $searchTerms = [
+            $items = [
                 [
                     'plaintext' => 'john@example.com',
                     'column' => 'email',
@@ -934,14 +934,14 @@ class ClientTest extends TestCase
                 ],
             ];
 
-            $searchTermsJson = json_encode($searchTerms, JSON_THROW_ON_ERROR);
-            $searchTermsResultJson = $client->createSearchTerms($clientPtr, $searchTermsJson);
+            $itemsJson = json_encode($items, JSON_THROW_ON_ERROR);
+            $searchTermResultsJson = $client->createSearchTerms($clientPtr, $itemsJson);
 
-            $searchTermsResult = json_decode(json: $searchTermsResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
-            $this->assertIsArray($searchTermsResult);
-            $this->assertCount(1, $searchTermsResult);
+            $searchTermResults = json_decode(json: $searchTermResultsJson, associative: true, flags: JSON_THROW_ON_ERROR);
+            $this->assertIsArray($searchTermResults);
+            $this->assertCount(1, $searchTermResults);
 
-            $searchTerm = $searchTermsResult[0];
+            $searchTerm = $searchTermResults[0];
             $this->assertIsArray($searchTerm);
             $this->assertNotNull($searchTerm['hm']);
             $this->assertNull($searchTerm['ob']);

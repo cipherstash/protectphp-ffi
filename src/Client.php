@@ -67,18 +67,18 @@ class Client
      * Encrypt plaintext for a specific table column.
      *
      * @param  string|null  $contextJson  Encryption context as a JSON string
-     * @return string Encrypted data as a JSON string
+     * @return string Encrypted envelope as a JSON string
      *
      * @throws FFIException When encryption fails
      */
-    public function encrypt(\FFI\CData $client, string $plaintext, string $columnName, string $tableName, ?string $contextJson = null): string
+    public function encrypt(\FFI\CData $client, string $plaintext, string $column, string $table, ?string $contextJson = null): string
     {
-        $resultPtr = $this->executeFFIOperation(function (\FFI\CData $errorPtr) use ($client, $plaintext, $columnName, $tableName, $contextJson): ?\FFI\CData {
+        $resultPtr = $this->executeFFIOperation(function (\FFI\CData $errorPtr) use ($client, $plaintext, $column, $table, $contextJson): ?\FFI\CData {
             $result = $this->ffi->encrypt(
                 $client,
                 $plaintext,
-                $columnName,
-                $tableName,
+                $column,
+                $table,
                 $contextJson,
                 \FFI::addr($errorPtr)
             );
@@ -125,18 +125,14 @@ class Client
      * Encrypt multiple values in a single batch operation.
      *
      * @param  string  $itemsJson  Items to encrypt as a JSON string
-     * @return string Array of encrypted objects as a JSON string
+     * @return string Encrypted envelopes as a JSON string
      *
      * @throws FFIException When encryption fails
      */
     public function encryptBulk(\FFI\CData $client, string $itemsJson): string
     {
         $resultPtr = $this->executeFFIOperation(function (\FFI\CData $errorPtr) use ($client, $itemsJson): ?\FFI\CData {
-            $result = $this->ffi->encrypt_bulk(
-                $client,
-                $itemsJson,
-                \FFI::addr($errorPtr)
-            );
+            $result = $this->ffi->encrypt_bulk($client, $itemsJson, \FFI::addr($errorPtr));
 
             return $result instanceof \FFI\CData ? $result : null;
         }, FFIException::failedToBulkEncrypt(...));
@@ -152,18 +148,14 @@ class Client
      * Decrypt multiple ciphertext values in a single batch operation.
      *
      * @param  string  $itemsJson  Items to decrypt as a JSON string
-     * @return string Array of decrypted plaintext strings as a JSON string
+     * @return string Decrypted plaintext strings as a JSON string
      *
      * @throws FFIException When decryption fails
      */
     public function decryptBulk(\FFI\CData $client, string $itemsJson): string
     {
         $resultPtr = $this->executeFFIOperation(function (\FFI\CData $errorPtr) use ($client, $itemsJson): ?\FFI\CData {
-            $result = $this->ffi->decrypt_bulk(
-                $client,
-                $itemsJson,
-                \FFI::addr($errorPtr)
-            );
+            $result = $this->ffi->decrypt_bulk($client, $itemsJson, \FFI::addr($errorPtr));
 
             return $result instanceof \FFI\CData ? $result : null;
         }, FFIException::failedToBulkDecrypt(...));
@@ -176,21 +168,17 @@ class Client
     }
 
     /**
-     * Create encrypted search terms for querying encrypted data.
+     * Create search terms for querying encrypted data.
      *
-     * @param  string  $termsJson  Search terms as a JSON string
-     * @return string Array of encrypted search terms as a JSON string
+     * @param  string  $itemsJson  Items to create search terms for as a JSON string
+     * @return string Search terms as a JSON string
      *
      * @throws FFIException When search term creation fails
      */
-    public function createSearchTerms(\FFI\CData $client, string $termsJson): string
+    public function createSearchTerms(\FFI\CData $client, string $itemsJson): string
     {
-        $resultPtr = $this->executeFFIOperation(function (\FFI\CData $errorPtr) use ($client, $termsJson): ?\FFI\CData {
-            $result = $this->ffi->create_search_terms(
-                $client,
-                $termsJson,
-                \FFI::addr($errorPtr)
-            );
+        $resultPtr = $this->executeFFIOperation(function (\FFI\CData $errorPtr) use ($client, $itemsJson): ?\FFI\CData {
+            $result = $this->ffi->create_search_terms($client, $itemsJson, \FFI::addr($errorPtr));
 
             return $result instanceof \FFI\CData ? $result : null;
         }, FFIException::failedToCreateSearchTerms(...));

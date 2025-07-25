@@ -382,8 +382,8 @@ try {
     $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
-        columnName: 'email',
-        tableName: 'users',
+        column: 'email',
+        table: 'users',
     );
 
     // {"k":"ct","c":"mBbKlk}G7QdaGiNj$dL7#+AOrA^}*VJx...","dt":"text","hm":"f3ca71fd39ae9d3d1d1fc25141bcb6da...","ob":null,"bf":[1124,2134,987,1456,743,2201],"i":{"t":"users","c":"email"},"v":2}
@@ -507,8 +507,8 @@ try {
     $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
-        columnName: 'email',
-        tableName: 'users',
+        column: 'email',
+        table: 'users',
     );
 
     $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
@@ -587,8 +587,8 @@ try {
     $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
-        columnName: 'email',
-        tableName: 'users',
+        column: 'email',
+        table: 'users',
         contextJson: $contextJson,
     );
 
@@ -646,8 +646,8 @@ try {
     $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
-        columnName: 'email',
-        tableName: 'users',
+        column: 'email',
+        table: 'users',
         contextJson: $contextJson,
     );
 
@@ -848,7 +848,7 @@ try {
     $configJson = json_encode($config, JSON_THROW_ON_ERROR);
     $clientPtr = $client->newClient($configJson);
 
-    $searchTerms = [
+    $items = [
         [
             'plaintext' => 'john@example.com',
             'column' => 'email',
@@ -864,8 +864,8 @@ try {
         ],
     ];
 
-    $searchTermsJson = json_encode($searchTerms, JSON_THROW_ON_ERROR);
-    $searchTermResultsJson = $client->createSearchTerms($clientPtr, $searchTermsJson);
+    $itemsJson = json_encode($items, JSON_THROW_ON_ERROR);
+    $searchTermResultsJson = $client->createSearchTerms($clientPtr, $itemsJson);
     // [{"hm":"f3ca71fd39ae9d3d1d1fc25141bcb6da...","ob":null,"bf":[1124,2134,987,1456,743,2201],"i":{"t":"users","c":"email"}},{"hm":"a8d5f2e9c4b7a1f3e8d2c5b9f6a3e7d1...","ob":["99f7adadadadadadc68b2822197a849e..."],"bf":null,"i":{"t":"users","c":"balance"}}]
 } finally {
     if ($clientPtr !== null) {
@@ -1054,8 +1054,8 @@ try {
     $encryptResultJson = $client->encrypt(
         client: $clientPtr,
         plaintext: 'john@example.com',
-        columnName: 'email',
-        tableName: 'users',
+        column: 'email',
+        table: 'users',
     );
 
     $encryptResult = json_decode(json: $encryptResultJson, associative: true, flags: JSON_THROW_ON_ERROR);
